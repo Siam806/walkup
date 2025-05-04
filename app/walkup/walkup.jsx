@@ -8,7 +8,6 @@ import Navbar from "../components/navbar";
 const App = () => {
   const [players, setPlayers] = useState([]);
   const [currentSong, setCurrentSong] = useState(null);
-  const [isAnnouncing, setIsAnnouncing] = useState(false);
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -37,10 +36,9 @@ const App = () => {
     });
   };
 
-  const speakAnnouncement = (text, onEndCallback) => {
+  const speakAnnouncement = (text) => {
     // Use ResponsiveVoice with Japanese Male voice
     if (window.responsiveVoice) {
-      setIsAnnouncing(true); // Indicate that an announcement is in progress
       window.responsiveVoice.speak(
         text,
         "Japanese Male",
@@ -48,10 +46,6 @@ const App = () => {
           rate: 1, // Speed of speech
           pitch: 1, // Tone of voice
           volume: 1, // Full volume
-          onend: () => {
-            setIsAnnouncing(false); // Announcement is over
-            if (onEndCallback) onEndCallback();
-          },
         }
       );
     } else {
@@ -59,20 +53,9 @@ const App = () => {
     }
   };
 
-  const handleAnnouncementAndPlay = (player) => {
+  const handleAnnouncement = (player) => {
     const announcement = `Now batting, number ${player.batting_number}, ${player.first_name} "${player.nickname}" ${player.last_name}, playing ${player.position}.`;
-
-    // Start playing the walk-up song at a lower volume
-    handlePlay(player.walk_up_song, player.walk_up_song_start, 15, 30); // Volume set to 30%
-
-    // Speak the announcement and restore volume after it ends
-    speakAnnouncement(announcement, () => {
-      // Restore the song volume to full after the announcement
-      setCurrentSong((prev) => ({
-        ...prev,
-        volume: 100, // Restore volume to 100%
-      }));
-    });
+    speakAnnouncement(announcement);
   };
 
   return (
@@ -90,32 +73,32 @@ const App = () => {
               <p>Batting Number: {player.batting_number}</p>
               <p>Position: {player.position}</p>
               <button
-                onClick={() => handlePlay(player.walk_up_song, player.walk_up_song_start)}
+                onClick={() => handlePlay(player.walk_up_song, player.walk_up_song_start, 15)}
                 className="mt-2 px-4 py-2 bg-blue-500 text-white rounded w-full sm:w-auto"
               >
                 Play Walk-Up Song (15s)
               </button>
               <button
                 onClick={() =>
-                  handlePlay(player.home_run_song, player.home_run_song_start, 45)
+                  handlePlay(player.home_run_song, player.home_run_song_start, 15)
                 }
                 className="mt-2 px-4 py-2 bg-green-700 text-white rounded w-full sm:w-auto"
               >
-                Play Home Run Song (45s)
+                Play Home Run Song (15s)
               </button>
               <button
                 onClick={() =>
-                  handlePlay(player.pitching_walk_up_song, player.pitching_walk_up_song_start, 45)
+                  handlePlay(player.pitching_walk_up_song, player.pitching_walk_up_song_start, 30)
                 }
                 className="mt-2 px-4 py-2 bg-red-700 text-white rounded w-full sm:w-auto"
               >
-                Play Pitching Walk-Up Song (45s)
+                Play Pitching Walk-Up Song (30s)
               </button>
               <button
-                onClick={() => handleAnnouncementAndPlay(player)}
-                className="mt-2 px-4 py-2 bg-purple-500 text-white rounded w-full sm:w-auto"
+                onClick={() => handleAnnouncement(player)}
+                className="mt-2 px-4 py-2 bg-yellow-500 text-white rounded w-full sm:w-auto"
               >
-                Announce + Play Walk-Up Song
+                Announce Player
               </button>
             </div>
           ))}
@@ -128,8 +111,8 @@ const App = () => {
               videoId={currentSong.videoId}
               start={currentSong.start}
               shouldPlay={true}
-              duration={15} // Limit the total duration to 15 seconds
-              volume={isAnnouncing ? currentSong.volume : 100} // Adjust volume based on announcement state
+              duration={currentSong.duration} // Pass the duration
+              volume={currentSong.volume} // Pass the volume
               onEnd={() => setCurrentSong(null)}
             />
           </div>
