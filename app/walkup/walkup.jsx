@@ -138,6 +138,18 @@ const App = () => {
           </div>
         )}
       </div>
+      <button
+  onClick={() => {
+    if (window.responsiveVoice) {
+      console.log("Calling responsiveVoice...");
+      window.responsiveVoice.speak("Testing voice playback", "UK English Male");
+    } else {
+      console.log("responsiveVoice not available");
+    }
+  }}
+>
+  Test Voice
+</button>
     </div>
   );
 };
