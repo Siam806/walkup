@@ -1,20 +1,7 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 
 const MainPage = () => {
-  useEffect(() => {
-    // Dynamically load the ResponsiveVoice script
-    const script = document.createElement("script");
-    script.src = "https://code.responsivevoice.org/responsivevoice.js?key=LPheIFLY";
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      // Cleanup the script when the component unmounts
-      document.body.removeChild(script);
-    };
-  }, []);
-
   return (
     <div className="p-8">
       <h1 className="text-3xl font-bold mb-6">Welcome to the Baseball Manager</h1>
@@ -44,7 +31,7 @@ const MainPage = () => {
           Edit Sound Effects
         </Link>
       </div>
-      </div>
+    </div>
   );
 };
 

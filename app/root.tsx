@@ -31,6 +31,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        {/* ✅ Add ResponsiveVoice here */}
+        <script
+          src="https://code.responsivevoice.org/responsivevoice.js?key=LPheIFLY"
+          async
+        ></script>
       </head>
       <body>
         {children}
@@ -40,6 +45,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     </html>
   );
 }
+
 
 export default function App() {
   return <Outlet />;
