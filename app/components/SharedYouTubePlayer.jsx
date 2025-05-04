@@ -1,26 +1,19 @@
 import React, { useEffect, useRef } from "react";
 import YouTube from "react-youtube";
 
-const SharedYouTubePlayer = ({ videoId, start = 0, shouldPlay, onEnd, duration = 15 }) => {
+const SharedYouTubePlayer = ({ videoId, start = 0, shouldPlay, onEnd, duration = 15, volume = 100 }) => {
   const timeoutRef = useRef(null);
-  const fadeOutRef = useRef(null);
   const playerRef = useRef(null);
 
   useEffect(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    if (fadeOutRef.current) clearInterval(fadeOutRef.current);
 
     if (shouldPlay && playerRef.current) {
       playerRef.current.seekTo(start);
       playerRef.current.playVideo();
+      playerRef.current.setVolume(volume); // Set initial volume
 
-      // Schedule fade-out before the song ends
-      const fadeOutStartTime = duration - 3; // Start fading out 3 seconds before the end
-      timeoutRef.current = setTimeout(() => {
-        startFadeOut();
-      }, fadeOutStartTime * 1000);
-
-      // Pause the video after the duration
+      // Stop the video after the specified duration
       timeoutRef.current = setTimeout(() => {
         playerRef.current.pauseVideo();
         if (onEnd) onEnd();
@@ -29,43 +22,12 @@ const SharedYouTubePlayer = ({ videoId, start = 0, shouldPlay, onEnd, duration =
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (fadeOutRef.current) clearInterval(fadeOutRef.current);
     };
-  }, [videoId, shouldPlay, start, onEnd, duration]);
-
-  const startFadeOut = () => {
-    if (!playerRef.current) return;
-
-    let volume = playerRef.current.getVolume(); // Get the current volume (0-100)
-    fadeOutRef.current = setInterval(() => {
-      if (volume > 0) {
-        volume -= 5; // Decrease volume by 5 units
-        playerRef.current.setVolume(volume);
-      } else {
-        clearInterval(fadeOutRef.current);
-      }
-    }, 200); // Reduce volume every 200ms
-  };
+  }, [videoId, shouldPlay, start, onEnd, duration, volume]); // Add volume and duration to dependencies
 
   const onReady = (event) => {
     playerRef.current = event.target;
-
-    if (shouldPlay) {
-      event.target.seekTo(start);
-      event.target.playVideo();
-
-      // Schedule fade-out before the song ends
-      const fadeOutStartTime = duration - 3; // Start fading out 3 seconds before the end
-      timeoutRef.current = setTimeout(() => {
-        startFadeOut();
-      }, fadeOutStartTime * 1000);
-
-      // Pause the video after the duration
-      timeoutRef.current = setTimeout(() => {
-        event.target.pauseVideo();
-        if (onEnd) onEnd();
-      }, duration * 1000);
-    }
+    playerRef.current.setVolume(volume); // Set volume when ready
   };
 
   return (

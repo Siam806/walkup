@@ -8,6 +8,7 @@ import Navbar from "../components/navbar";
 const App = () => {
   const [players, setPlayers] = useState([]);
   const [currentSong, setCurrentSong] = useState(null);
+  const [isAnnouncing, setIsAnnouncing] = useState(false);
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -26,31 +27,52 @@ const App = () => {
     fetchPlayers();
   }, []);
 
-  const handlePlay = (songUrl, startTime, duration = 15) => {
+  const handlePlay = (songUrl, startTime, duration = 15, volume = 100) => {
     const videoId = extractVideoId(songUrl);
     setCurrentSong({
       videoId,
       start: startTime || 0,
       duration,
+      volume,
     });
   };
 
-  const speakAnnouncement = (text) => {
-    // Check if ResponsiveVoice is loaded
+  const speakAnnouncement = (text, onEndCallback) => {
+    // Use ResponsiveVoice with Japanese Male voice
     if (window.responsiveVoice) {
-      window.responsiveVoice.speak(text, "Japanese Male", {
-        rate: 1, // Speed of speech
-        pitch: 1, // Tone of voice
-        volume: 1, // Full volume
-      });
+      setIsAnnouncing(true); // Indicate that an announcement is in progress
+      window.responsiveVoice.speak(
+        text,
+        "Japanese Male",
+        {
+          rate: 1, // Speed of speech
+          pitch: 1, // Tone of voice
+          volume: 1, // Full volume
+          onend: () => {
+            setIsAnnouncing(false); // Announcement is over
+            if (onEndCallback) onEndCallback();
+          },
+        }
+      );
     } else {
       console.error("ResponsiveVoice is not loaded. Ensure the script is included in your index.html.");
     }
   };
 
-  const handleAnnouncement = (player) => {
+  const handleAnnouncementAndPlay = (player) => {
     const announcement = `Now batting, number ${player.batting_number}, ${player.first_name} "${player.nickname}" ${player.last_name}, playing ${player.position}.`;
-    speakAnnouncement(announcement);
+
+    // Start playing the walk-up song at a lower volume
+    handlePlay(player.walk_up_song, player.walk_up_song_start, 15, 30); // Volume set to 30%
+
+    // Speak the announcement and restore volume after it ends
+    speakAnnouncement(announcement, () => {
+      // Restore the song volume to full after the announcement
+      setCurrentSong((prev) => ({
+        ...prev,
+        volume: 100, // Restore volume to 100%
+      }));
+    });
   };
 
   return (
@@ -71,7 +93,7 @@ const App = () => {
                 onClick={() => handlePlay(player.walk_up_song, player.walk_up_song_start)}
                 className="mt-2 px-4 py-2 bg-blue-500 text-white rounded w-full sm:w-auto"
               >
-                Play Walk-Up Song
+                Play Walk-Up Song (15s)
               </button>
               <button
                 onClick={() =>
@@ -90,10 +112,10 @@ const App = () => {
                 Play Pitching Walk-Up Song (45s)
               </button>
               <button
-                onClick={() => handleAnnouncement(player)}
-                className="mt-2 px-4 py-2 bg-yellow-500 text-white rounded w-full sm:w-auto"
+                onClick={() => handleAnnouncementAndPlay(player)}
+                className="mt-2 px-4 py-2 bg-purple-500 text-white rounded w-full sm:w-auto"
               >
-                Announce Player
+                Announce + Play Walk-Up Song
               </button>
             </div>
           ))}
@@ -106,7 +128,8 @@ const App = () => {
               videoId={currentSong.videoId}
               start={currentSong.start}
               shouldPlay={true}
-              duration={currentSong.duration} // Pass the duration
+              duration={15} // Limit the total duration to 15 seconds
+              volume={isAnnouncing ? currentSong.volume : 100} // Adjust volume based on announcement state
               onEnd={() => setCurrentSong(null)}
             />
           </div>
