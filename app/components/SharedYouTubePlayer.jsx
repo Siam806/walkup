@@ -1,32 +1,19 @@
-import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState } from "react";
+import React, { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import YouTube from "react-youtube";
-
-const isIOS = () => {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-};
 
 const SharedYouTubePlayer = forwardRef(
   ({ videoId, start = 0, shouldPlay, onEnd, duration, volume = 100 }, ref) => {
     const timeoutRef = useRef(null);
     const fadeOutRef = useRef(null);
     const playerRef = useRef(null);
-    const [showIOSButton, setShowIOSButton] = useState(isIOS());
 
     const onReady = (event) => {
       playerRef.current = event.target;
       playerRef.current.setVolume(volume);
 
-      if (shouldPlay && !isIOS()) {
+      if (shouldPlay) {
         playerRef.current.seekTo(start);
         playerRef.current.playVideo();
-      }
-    };
-
-    const handleIOSPlay = () => {
-      if (playerRef.current) {
-        playerRef.current.seekTo(start);
-        playerRef.current.playVideo();
-        setShowIOSButton(false); // Hide the overlay after starting the video
       }
     };
 
@@ -74,16 +61,6 @@ const SharedYouTubePlayer = forwardRef(
 
     return (
       <div className="relative">
-        {showIOSButton && (
-          <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-20">
-            <button
-              onClick={handleIOSPlay}
-              className="bg-blue-500 text-white text-lg px-6 py-3 rounded shadow-lg"
-            >
-              Start Song
-            </button>
-          </div>
-        )}
         <YouTube
           videoId={videoId}
           opts={{

@@ -4,9 +4,14 @@ import SharedYouTubePlayer from "../components/SharedYouTubePlayer";
 import { extractVideoId } from "../utils";
 import Navbar from "../components/navbar";
 
+const isIOS = () => {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+};
+
 const App = () => {
   const [players, setPlayers] = useState([]);
   const [currentSong, setCurrentSong] = useState(null);
+  const [showIOSOverlay, setShowIOSOverlay] = useState(isIOS());
   const playerRef = useRef(null); // Ref for controlling volume
 
   useEffect(() => {
@@ -34,6 +39,14 @@ const App = () => {
       duration, // Pass null if no duration is provided
       volume,
     });
+  };
+
+  const handleIOSPlay = () => {
+    if (playerRef.current) {
+      playerRef.current.seekTo(currentSong.start);
+      playerRef.current.playVideo();
+      setShowIOSOverlay(false); // Hide the overlay after starting the video
+    }
   };
 
   const speakAnnouncement = (
@@ -130,6 +143,16 @@ const App = () => {
 
   return (
     <div>
+      {showIOSOverlay && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+          <button
+            onClick={handleIOSPlay}
+            className="bg-blue-500 text-white text-lg px-6 py-3 rounded shadow-lg"
+          >
+            Start Song
+          </button>
+        </div>
+      )}
       <Navbar />
       <div className="pt-20 p-4 sm:p-6 md:p-8">
         <h1 className="text-xl sm:text-2xl font-bold mb-6">Team Walk-Up Songs</h1>
