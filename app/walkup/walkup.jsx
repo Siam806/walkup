@@ -36,28 +36,36 @@ const App = () => {
     });
   };
 
-  const speakAnnouncement = (text, voice = "US English Male", onEndCallback = null) => {
-    // Use ResponsiveVoice with the specified voice
+  const speakAnnouncement = (
+    text,
+    voice = "US English Male",
+    onEndCallback = null
+  ) => {
     if (window.responsiveVoice) {
-      window.responsiveVoice.speak(
-        text,
-        voice,
-        {
-          rate: 1, // Slightly slower speech
-          pitch: 1, // Slightly higher pitch
-          volume: 1, // Full volume
-          onend: onEndCallback,
-        }
-      );
+      // Add subtle pauses and emphasize key phrases
+      const enhancedText = text
+        .replace(/:\s*/g, ". ") // convert colons to pauses
+        .replace(/\.\s*/g, ". ") // ensure proper spacing after periods
+        .replace(/,/g, ", ") // ensure natural breaks at commas
+        .replace(/!+/g, ".") // reduce unnatural shouting tone
+        .replace(/\s+/g, " ") // normalize spacing
+        .trim();
+  
+      window.responsiveVoice.speak(enhancedText, voice, {
+        rate: 0.92,      // natural pace
+        pitch: 1.02,     // slightly expressive
+        volume: 1,       // max volume
+        onend: onEndCallback,
+      });
     } else {
-      console.error("ResponsiveVoice is not loaded. Ensure the script is included in your index.html.");
+      console.error("ResponsiveVoice is not loaded. Ensure the script is included globally.");
     }
   };
 
   const handleAnnouncement = (player) => {
-    // Announcement text excluding the name
-    const announcement = `Now batting, number ${player.jersey_number}, playing ${player.position}.`;
-
+    // Announcement text with pauses and slower speech rate for the first part
+    const announcement = `Now batting...`;
+  
     // Map nationality to voice
     const voiceMap = {
       US: "US English Male",
@@ -67,16 +75,24 @@ const App = () => {
       FR: "French Male",
       DE: "Deutsch Male",
     };
-
+  
     const nativeVoice = voiceMap[player.nationality] || "US English Male";
-
-    // Speak the announcement in US English Male
+  
+    // Speak "Now batting"
     speakAnnouncement(announcement, "US English Male", () => {
-      // Speak the player's name in their native language
-      const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
-      speakAnnouncement(name, nativeVoice);
+      // Speak the jersey number and position together with a faster rate
+      const numberAndPositionAnnouncement = `Number ${player.jersey_number}, playing as ${player.position}.`;
+      speakAnnouncement(numberAndPositionAnnouncement, "US English Male", () => {
+        // Speak the player's name in their native language
+        const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
+        speakAnnouncement(name, nativeVoice);
+      });
     });
   };
+  
+  
+  
+  
 
   return (
     <div>
