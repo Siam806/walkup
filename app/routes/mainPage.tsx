@@ -44,6 +44,18 @@ const MainPage = () => {
           Edit Sound Effects
         </Link>
       </div>
+      <button
+  onClick={() => {
+    if ((window as any).responsiveVoice) {
+      console.log("Calling responsiveVoice...");
+      (window as any).responsiveVoice.speak("Testing voice playback", "UK English Male");
+    } else {
+      console.log("responsiveVoice not available");
+    }
+  }}
+>
+  Test Voice
+</button>
     </div>
   );
 };
