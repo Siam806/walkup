@@ -10,9 +10,16 @@ const SharedYouTubePlayer = forwardRef(
     const onReady = (event) => {
       playerRef.current = event.target;
       playerRef.current.setVolume(volume);
+
       if (shouldPlay) {
+        playerRef.current.mute(); // Start muted to bypass autoplay restrictions
         playerRef.current.seekTo(start);
         playerRef.current.playVideo();
+
+        // Unmute after a short delay
+        setTimeout(() => {
+          playerRef.current.unMute();
+        }, 500);
       }
     };
 
