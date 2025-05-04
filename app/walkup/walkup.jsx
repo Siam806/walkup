@@ -38,7 +38,7 @@ const App = () => {
   const speakAnnouncement = (text) => {
     // Check if ResponsiveVoice is loaded
     if (window.responsiveVoice) {
-      window.responsiveVoice.speak(text, "US English Male", {
+      window.responsiveVoice.speak(text, "Japanese Male", {
         rate: 1, // Speed of speech
         pitch: 1, // Tone of voice
         volume: 1, // Full volume
