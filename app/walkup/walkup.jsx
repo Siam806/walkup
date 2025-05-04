@@ -36,38 +36,22 @@ const App = () => {
   };
 
   const speakAnnouncement = (text) => {
-    // Create a new SpeechSynthesisUtterance instance
-    const speech = new SpeechSynthesisUtterance(text);
-    
-    // Set the language to Japanese
-    speech.lang = 'ja-JP'; // Japanese language code
-    
-    // Customize speech rate, pitch, and volume
-    speech.rate = 1; // Speed of speech
-    speech.pitch = 1; // Neutral pitch
-    speech.volume = 1; // Full volume
-    
-    // Get the available voices
-    const voices = window.speechSynthesis.getVoices();
-  
-    // Find a Japanese male voice (Voice names can vary, but this should work in most cases)
-    const selectedVoice = voices.find(voice => voice.lang === 'ja-JP' && voice.name.includes('Google 日本語男性'));
-  
-    // If a suitable voice is found, apply it
-    if (selectedVoice) {
-      speech.voice = selectedVoice;
+    // Check if ResponsiveVoice is loaded
+    if (window.responsiveVoice) {
+      window.responsiveVoice.speak(text, "US English Male", {
+        rate: 1, // Speed of speech
+        pitch: 1, // Tone of voice
+        volume: 1, // Full volume
+      });
     } else {
-      console.log("Japanese male voice not found, using default.");
+      console.error("ResponsiveVoice is not loaded. Ensure the script is included in your index.html.");
     }
-  
-    // Speak the announcement
-    window.speechSynthesis.speak(speech);
   };
+
   const handleAnnouncement = (player) => {
     const announcement = `Now batting, number ${player.batting_number}, ${player.first_name} "${player.nickname}" ${player.last_name}, playing ${player.position}.`;
     speakAnnouncement(announcement);
   };
-  
 
   return (
     <div>
