@@ -36,16 +36,17 @@ const App = () => {
     });
   };
 
-  const speakAnnouncement = (text) => {
-    // Use ResponsiveVoice with Japanese Male voice
+  const speakAnnouncement = (text, voice = "US English Male", onEndCallback = null) => {
+    // Use ResponsiveVoice with the specified voice
     if (window.responsiveVoice) {
       window.responsiveVoice.speak(
         text,
-        "Japanese Male",
+        voice,
         {
           rate: 1, // Speed of speech
           pitch: 1, // Tone of voice
           volume: 1, // Full volume
+          onend: onEndCallback,
         }
       );
     } else {
@@ -54,8 +55,20 @@ const App = () => {
   };
 
   const handleAnnouncement = (player) => {
-    const announcement = `Now batting, number ${player.batting_number}, ${player.first_name} "${player.nickname}" ${player.last_name}, playing ${player.position}.`;
-    speakAnnouncement(announcement);
+    const nonThaiPart = `Now batting, number ${player.batting_number}, playing ${player.position},`;
+    const thaiPart = `${player.first_name} "${player.nickname}" ${player.last_name}`;
+
+    if (player.first_name.startsWith("Siam")) {
+      // Speak the non-Thai part first
+      speakAnnouncement(nonThaiPart, "US English Male", () => {
+        // Speak the Thai part after the non-Thai part finishes
+        speakAnnouncement(thaiPart, "Thai Male");
+      });
+    } else {
+      // Speak the entire announcement in English if the first name doesn't start with "Siam"
+      const fullAnnouncement = `${nonThaiPart} ${thaiPart}`;
+      speakAnnouncement(fullAnnouncement, "US English Male");
+    }
   };
 
   return (
