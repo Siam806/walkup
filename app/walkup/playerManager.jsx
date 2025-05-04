@@ -12,11 +12,12 @@ const PlayerManager = () => {
     batting_number: "",
     position: "",
     walk_up_song: "",
-    walk_up_song_start: "", // Changed from 0 to ""
+    walk_up_song_start: "",
     home_run_song: "",
-    home_run_song_start: "", // Changed from 0 to ""
+    home_run_song_start: "",
     pitching_walk_up_song: "",
-    pitching_walk_up_song_start: "", // Changed from 0 to ""
+    pitching_walk_up_song_start: "",
+    nationality: "US", // Default nationality
   });
 
   const [players, setPlayers] = useState([]);
@@ -59,6 +60,7 @@ const PlayerManager = () => {
         home_run_song_start: "",
         pitching_walk_up_song: "",
         pitching_walk_up_song_start: "",
+        nationality: "US", // Reset to default
       });
       const { data, error: fetchError } = await supabase.from("players").select("*");
       if (fetchError) {
@@ -127,6 +129,19 @@ const PlayerManager = () => {
               placeholder="Position"
               className="p-2 border rounded w-full"
             />
+            <select
+              name="nationality"
+              value={form.nationality}
+              onChange={handleChange}
+              className="p-2 border rounded w-full bg-gray-100 text-gray-800"
+            >
+              <option value="US">United States</option>
+              <option value="TH">Thailand</option>
+              <option value="JP">Japan</option>
+              <option value="UK">United Kingdom</option>
+              <option value="FR">France</option>
+              <option value="DE">Germany</option>
+            </select>
             <input
               type="text"
               name="walk_up_song"
@@ -191,6 +206,7 @@ const PlayerManager = () => {
               </h3>
               <p>Jersey Number: {player.jersey_number}</p>
               <p>Position: {player.position}</p>
+              <p>Nationality: {player.nationality}</p>
               <Link
                 to={`/edit-player/${player.id}`}
                 className="mt-2 px-4 py-2 bg-green-500 text-white rounded block sm:inline-block"

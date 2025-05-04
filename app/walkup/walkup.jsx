@@ -43,8 +43,8 @@ const App = () => {
         text,
         voice,
         {
-          rate: 1, // Speed of speech
-          pitch: 1, // Tone of voice
+          rate: 0.9, // Slightly slower speech
+          pitch: 1.1, // Slightly higher pitch
           volume: 1, // Full volume
           onend: onEndCallback,
         }
@@ -58,17 +58,23 @@ const App = () => {
     const nonThaiPart = `Now batting, number ${player.batting_number}, playing ${player.position},`;
     const thaiPart = `${player.first_name} "${player.nickname}" ${player.last_name}`;
 
-    if (player.first_name.startsWith("Siam")) {
-      // Speak the non-Thai part first
-      speakAnnouncement(nonThaiPart, "US English Male", () => {
-        // Speak the Thai part after the non-Thai part finishes
-        speakAnnouncement(thaiPart, "Thai Male");
-      });
-    } else {
-      // Speak the entire announcement in English if the first name doesn't start with "Siam"
-      const fullAnnouncement = `${nonThaiPart} ${thaiPart}`;
-      speakAnnouncement(fullAnnouncement, "US English Male");
-    }
+    // Map nationality to voice
+    const voiceMap = {
+      US: "US English Male",
+      TH: "Thai Male",
+      JP: "Japanese Male",
+      UK: "UK English Male",
+      FR: "French Male",
+      DE: "Deutsch Male",
+    };
+
+    const voice = voiceMap[player.nationality] || "US English Male";
+
+    // Speak the non-Thai part first
+    speakAnnouncement(nonThaiPart, "US English Male", () => {
+      // Speak the Thai part in the player's native voice
+      speakAnnouncement(thaiPart, voice);
+    });
   };
 
   return (
