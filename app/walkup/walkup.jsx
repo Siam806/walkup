@@ -1,13 +1,16 @@
 // App.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../supabaseClient";
 import SharedYouTubePlayer from "../components/SharedYouTubePlayer";
 import { extractVideoId } from "../utils";
 import Navbar from "../components/navbar";
 
+
 const App = () => {
   const [players, setPlayers] = useState([]);
   const [currentSong, setCurrentSong] = useState(null);
+  const playerRef = useRef(null); // NEW: Ref for controlling volume
+
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -63,10 +66,6 @@ const App = () => {
   };
 
   const handleAnnouncement = (player) => {
-    // Announcement text with pauses and slower speech rate for the first part
-    const announcement = `Now batting...`;
-  
-    // Map nationality to voice
     const voiceMap = {
       US: "US English Male",
       TH: "Thai Male",
@@ -78,17 +77,58 @@ const App = () => {
   
     const nativeVoice = voiceMap[player.nationality] || "US English Male";
   
-    // Speak "Now batting"
-    speakAnnouncement(announcement, "US English Male", () => {
-      // Speak the jersey number and position together with a faster rate
-      const numberAndPositionAnnouncement = `Number ${player.jersey_number}, playing as ${player.position}.`;
-      speakAnnouncement(numberAndPositionAnnouncement, "US English Male", () => {
-        // Speak the player's name in their native language
+    const originalVolume = playerRef.current?.getVolume?.() ?? 100;
+    if (playerRef.current?.setVolume) {
+      playerRef.current.setVolume(30); // duck volume
+    }
+    speakAnnouncement("Now batting...", "US English Male", () => {
+      const mid = `Number ${player.jersey_number}, playing as ${player.position}.`;
+      speakAnnouncement(mid, "US English Male", () => {
         const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
-        speakAnnouncement(name, nativeVoice);
+        speakAnnouncement(name, nativeVoice, () => {
+          if (playerRef.current?.setVolume) {
+            playerRef.current.setVolume(originalVolume); // restore volume
+          }
+        });
       });
     });
   };
+
+  const handleIntro = (player) => {
+    const voiceMap = {
+      US: "US English Male",
+      TH: "Thai Male",
+      JP: "Japanese Male",
+      UK: "UK English Male",
+      FR: "French Male",
+      DE: "Deutsch Male",
+    };
+  
+    const nativeVoice = voiceMap[player.nationality] || "US English Male";
+    const englishVoice = "US English Male";
+    const originalVolume = playerRef.current?.getVolume?.() ?? 100;
+  
+    // 1. Start the music at low volume
+    handlePlay(player.walk_up_song, player.walk_up_song_start, 15, 30);
+  
+    // 2. Speak intro in English
+    speakAnnouncement(
+      `Now batting. Number ${player.jersey_number}, playing as ${player.position}.`,
+      englishVoice,
+      () => {
+        // 3. Then speak the name in the player's native voice
+        const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
+        speakAnnouncement(name, nativeVoice, () => {
+          // 4. Restore volume
+          if (playerRef.current?.setVolume) {
+            playerRef.current.setVolume(originalVolume);
+          }
+        });
+      }
+    );
+  };
+  
+  
   
   
   
@@ -136,6 +176,13 @@ const App = () => {
               >
                 Announce Player
               </button>
+              <button
+  onClick={() => handleIntro(player)}
+  className="mt-2 px-4 py-2 bg-purple-600 text-white rounded w-full sm:w-auto"
+>
+  Intro: Announce + Play Walk-Up
+</button>
+
             </div>
           ))}
         </div>
@@ -143,14 +190,16 @@ const App = () => {
         {currentSong && (
           <div className="mt-8">
             <SharedYouTubePlayer
-              key={currentSong.videoId}
-              videoId={currentSong.videoId}
-              start={currentSong.start}
-              shouldPlay={true}
-              duration={currentSong.duration} // Pass the duration
-              volume={currentSong.volume} // Pass the volume
-              onEnd={() => setCurrentSong(null)}
-            />
+  ref={playerRef}
+  key={currentSong.videoId}
+  videoId={currentSong.videoId}
+  start={currentSong.start}
+  shouldPlay={true}
+  duration={currentSong.duration}
+  volume={currentSong.volume}
+  onEnd={() => setCurrentSong(null)}
+/>
+
           </div>
         )}
       </div>
