@@ -26,7 +26,7 @@ const SharedYouTubePlayer = forwardRef(
       if (playerRef.current) {
         playerRef.current.seekTo(start);
         playerRef.current.playVideo();
-        setShowIOSButton(false); // Hide the button after starting the video
+        setShowIOSButton(false); // Hide the overlay after starting the video
       }
     };
 
@@ -75,12 +75,14 @@ const SharedYouTubePlayer = forwardRef(
     return (
       <div className="relative">
         {showIOSButton && (
-          <button
-            onClick={handleIOSPlay}
-            className="absolute inset-0 bg-black bg-opacity-50 text-white text-xl flex items-center justify-center z-10"
-          >
-            Start Song
-          </button>
+          <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-20">
+            <button
+              onClick={handleIOSPlay}
+              className="bg-blue-500 text-white text-lg px-6 py-3 rounded shadow-lg"
+            >
+              Start Song
+            </button>
+          </div>
         )}
         <YouTube
           videoId={videoId}
