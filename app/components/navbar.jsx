@@ -5,8 +5,8 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <nav className="bg-gray-800 text-white p-4 fixed top-0 left-0 w-full z-50 shadow-md">
-      <div className="container mx-auto flex justify-between items-center">
+    <nav className="bg-gray-800 text-white p-4 fixed top-0 left-0 w-full z-50 shadow-md h-16">
+      <div className="container mx-auto flex justify-between items-center h-full">
         {/* Logo */}
         <h1 className="text-xl font-bold">Baseball Manager</h1>
 
@@ -51,6 +51,13 @@ const Navbar = () => {
             onClick={() => setIsOpen(false)}
           >
             Sound Effects
+          </Link>
+          <Link
+            to="/edit-sound-effects"
+            className="block md:inline px-4 py-2 md:p-0 hover:bg-gray-700 md:hover:bg-transparent"
+            onClick={() => setIsOpen(false)}
+          >
+            Edit Sound Effects
           </Link>
         </div>
       </div>

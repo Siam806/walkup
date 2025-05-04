@@ -24,6 +24,12 @@ const MainPage = () => {
         >
           Sound Effects
         </Link>
+        <Link
+        to="/edit-sound-effects"
+        className="block p-6 bg-red-500 text-white text-center rounded shadow hover:bg-red-600"
+        >
+          Edit Sound Effects
+        </Link>
       </div>
     </div>
   );

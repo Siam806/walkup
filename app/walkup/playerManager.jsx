@@ -72,7 +72,7 @@ const PlayerManager = () => {
   return (
     <div>
       <Navbar />
-      <div className="p-4 sm:p-6 md:p-8">
+      <div className="pt-20 p-4 sm:p-6 md:p-8">
         <h1 className="text-xl sm:text-2xl font-bold mb-6">Player Manager</h1>
         <form onSubmit={handleSubmit} className="mb-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
