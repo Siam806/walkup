@@ -55,8 +55,8 @@ const App = () => {
   };
 
   const handleAnnouncement = (player) => {
-    const nonThaiPart = `Now batting, number ${player.batting_number}, playing ${player.position},`;
-    const thaiPart = `${player.first_name} "${player.nickname}" ${player.last_name}`;
+    // Announcement text excluding the name
+    const announcement = `Now batting, number ${player.batting_number}, playing ${player.position}.`;
 
     // Map nationality to voice
     const voiceMap = {
@@ -68,12 +68,13 @@ const App = () => {
       DE: "Deutsch Male",
     };
 
-    const voice = voiceMap[player.nationality] || "US English Male";
+    const nativeVoice = voiceMap[player.nationality] || "US English Male";
 
-    // Speak the non-Thai part first
-    speakAnnouncement(nonThaiPart, "US English Male", () => {
-      // Speak the Thai part in the player's native voice
-      speakAnnouncement(thaiPart, voice);
+    // Speak the announcement in US English Male
+    speakAnnouncement(announcement, "US English Male", () => {
+      // Speak the player's name in their native language
+      const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
+      speakAnnouncement(name, nativeVoice);
     });
   };
 
