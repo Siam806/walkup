@@ -31,7 +31,9 @@ const MainPage = () => {
           Edit Sound Effects
         </Link>
       </div>
+      <script src="https://code.responsivevoice.org/responsivevoice.js?key=LPheIFLY"></script>
     </div>
+    
   );
 };
 

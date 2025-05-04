@@ -12,11 +12,11 @@ const PlayerManager = () => {
     batting_number: "",
     position: "",
     walk_up_song: "",
-    walk_up_song_start: 0,
+    walk_up_song_start: "", // Changed from 0 to ""
     home_run_song: "",
-    home_run_song_start: 0,
+    home_run_song_start: "", // Changed from 0 to ""
     pitching_walk_up_song: "",
-    pitching_walk_up_song_start: 0,
+    pitching_walk_up_song_start: "", // Changed from 0 to ""
   });
 
   const [players, setPlayers] = useState([]);
@@ -54,11 +54,11 @@ const PlayerManager = () => {
         batting_number: "",
         position: "",
         walk_up_song: "",
-        walk_up_song_start: 0,
+        walk_up_song_start: "",
         home_run_song: "",
-        home_run_song_start: 0,
+        home_run_song_start: "",
         pitching_walk_up_song: "",
-        pitching_walk_up_song_start: 0,
+        pitching_walk_up_song_start: "",
       });
       const { data, error: fetchError } = await supabase.from("players").select("*");
       if (fetchError) {
