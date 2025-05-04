@@ -121,14 +121,24 @@ const PlayerManager = () => {
               placeholder="Batting Number"
               className="p-2 border rounded w-full"
             />
-            <input
-              type="text"
+            <select
               name="position"
               value={form.position}
               onChange={handleChange}
-              placeholder="Position"
-              className="p-2 border rounded w-full"
-            />
+              className="p-2 border rounded w-full bg-gray-100 text-gray-800"
+            >
+              <option value="">Select Position</option>
+              <option value="Pitcher">Pitcher</option>
+              <option value="Catcher">Catcher</option>
+              <option value="First Base">First Base</option>
+              <option value="Second Base">Second Base</option>
+              <option value="Third Base">Third Base</option>
+              <option value="Shortstop">Shortstop</option>
+              <option value="Left Field">Left Field</option>
+              <option value="Center Field">Center Field</option>
+              <option value="Right Field">Right Field</option>
+              <option value="Designated Hitter">Designated Hitter</option>
+            </select>
             <select
               name="nationality"
               value={form.nationality}
