@@ -1,16 +1,13 @@
-// App.js
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../supabaseClient";
 import SharedYouTubePlayer from "../components/SharedYouTubePlayer";
 import { extractVideoId } from "../utils";
 import Navbar from "../components/navbar";
 
-
 const App = () => {
   const [players, setPlayers] = useState([]);
   const [currentSong, setCurrentSong] = useState(null);
-  const playerRef = useRef(null); // NEW: Ref for controlling volume
-
+  const playerRef = useRef(null); // Ref for controlling volume
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -29,12 +26,12 @@ const App = () => {
     fetchPlayers();
   }, []);
 
-  const handlePlay = (songUrl, startTime, duration = 15, volume = 100) => {
+  const handlePlay = (songUrl, startTime, duration = null, volume = 100) => {
     const videoId = extractVideoId(songUrl);
     setCurrentSong({
       videoId,
       start: startTime || 0,
-      duration,
+      duration, // Pass null if no duration is provided
       volume,
     });
   };
@@ -45,7 +42,6 @@ const App = () => {
     onEndCallback = null
   ) => {
     if (window.responsiveVoice) {
-      // Add subtle pauses and emphasize key phrases
       const enhancedText = text
         .replace(/:\s*/g, ". ") // convert colons to pauses
         .replace(/\.\s*/g, ". ") // ensure proper spacing after periods
@@ -74,12 +70,12 @@ const App = () => {
       FR: "French Male",
       DE: "Deutsch Male",
     };
-  
+
     const nativeVoice = voiceMap[player.nationality] || "US English Male";
-  
+
     const originalVolume = playerRef.current?.getVolume?.() ?? 100;
     if (playerRef.current?.setVolume) {
-      playerRef.current.setVolume(30); // duck volume
+      playerRef.current.setVolume(30); // Duck volume
     }
     speakAnnouncement("Now batting...", "US English Male", () => {
       const mid = `Number ${player.jersey_number}, playing as ${player.position}.`;
@@ -87,7 +83,7 @@ const App = () => {
         const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
         speakAnnouncement(name, nativeVoice, () => {
           if (playerRef.current?.setVolume) {
-            playerRef.current.setVolume(originalVolume); // restore volume
+            playerRef.current.setVolume(originalVolume); // Restore volume
           }
         });
       });
@@ -103,36 +99,34 @@ const App = () => {
       FR: "French Male",
       DE: "Deutsch Male",
     };
-  
+
     const nativeVoice = voiceMap[player.nationality] || "US English Male";
     const englishVoice = "US English Male";
     const originalVolume = playerRef.current?.getVolume?.() ?? 100;
-  
-    // 1. Start the music at low volume
-    handlePlay(player.walk_up_song, player.walk_up_song_start, 15, 30);
-  
-    // 2. Speak intro in English
-    speakAnnouncement(
-      `Now batting. Number ${player.jersey_number}, playing as ${player.position}.`,
-      englishVoice,
-      () => {
-        // 3. Then speak the name in the player's native voice
+
+    // Duck the volume before announcement
+    if (playerRef.current?.setVolume) {
+      playerRef.current.setVolume(30); // Reduce volume for the announcement
+    }
+
+    // Start the announcement and music simultaneously
+    speakAnnouncement("Now batting...", englishVoice, () => {
+      // Start the walk-up song immediately after starting the announcement
+      handlePlay(player.walk_up_song, player.walk_up_song_start, 15, 30); // Music starts immediately
+
+      // Continue the rest of the announcement
+      const middle = `Number ${player.jersey_number}, playing as ${player.position}.`;
+      speakAnnouncement(middle, englishVoice, () => {
         const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
         speakAnnouncement(name, nativeVoice, () => {
-          // 4. Restore volume
+          // Restore volume after the announcement
           if (playerRef.current?.setVolume) {
             playerRef.current.setVolume(originalVolume);
           }
         });
-      }
-    );
+      });
+    });
   };
-  
-  
-  
-  
-  
-  
 
   return (
     <div>
@@ -156,11 +150,11 @@ const App = () => {
               </button>
               <button
                 onClick={() =>
-                  handlePlay(player.home_run_song, player.home_run_song_start, 15)
+                  handlePlay(player.home_run_song, player.home_run_song_start) // No duration passed
                 }
                 className="mt-2 px-4 py-2 bg-green-700 text-white rounded w-full sm:w-auto"
               >
-                Play Home Run Song (15s)
+                Play Home Run Song
               </button>
               <button
                 onClick={() =>
@@ -177,12 +171,11 @@ const App = () => {
                 Announce Player
               </button>
               <button
-  onClick={() => handleIntro(player)}
-  className="mt-2 px-4 py-2 bg-purple-600 text-white rounded w-full sm:w-auto"
->
-  Intro: Announce + Play Walk-Up
-</button>
-
+                onClick={() => handleIntro(player)}
+                className="mt-2 px-4 py-2 bg-purple-600 text-white rounded w-full sm:w-auto"
+              >
+                Intro: Announce + Play Walk-Up
+              </button>
             </div>
           ))}
         </div>
@@ -190,20 +183,19 @@ const App = () => {
         {currentSong && (
           <div className="mt-8">
             <SharedYouTubePlayer
-  ref={playerRef}
-  key={currentSong.videoId}
-  videoId={currentSong.videoId}
-  start={currentSong.start}
-  shouldPlay={true}
-  duration={currentSong.duration}
-  volume={currentSong.volume}
-  onEnd={() => setCurrentSong(null)}
-/>
-
+              ref={playerRef}
+              key={currentSong.videoId}
+              videoId={currentSong.videoId}
+              start={currentSong.start}
+              shouldPlay={true}
+              duration={currentSong.duration}
+              volume={currentSong.volume}
+              onEnd={() => setCurrentSong(null)}
+            />
           </div>
         )}
       </div>
-      </div>
+    </div>
   );
 };
 

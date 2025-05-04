@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useImperativeHandle, forwardRef } from "react
 import YouTube from "react-youtube";
 
 const SharedYouTubePlayer = forwardRef(
-  ({ videoId, start = 0, shouldPlay, onEnd, duration = 15, volume = 100 }, ref) => {
+  ({ videoId, start = 0, shouldPlay, onEnd, duration, volume = 100 }, ref) => {
     const timeoutRef = useRef(null);
     const fadeOutRef = useRef(null);
     const playerRef = useRef(null);
@@ -32,7 +32,8 @@ const SharedYouTubePlayer = forwardRef(
     };
 
     const onStateChange = (event) => {
-      if (event.data === 1) {
+      if (event.data === 1 && duration) {
+        // Only set a timeout if a duration is provided
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         timeoutRef.current = setTimeout(() => {
           startFadeOut();
