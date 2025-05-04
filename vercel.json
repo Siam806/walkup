@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "./routes/mainPage.tsx" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
