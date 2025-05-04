@@ -1,25 +1,32 @@
-import React, { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
+import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState } from "react";
 import YouTube from "react-youtube";
+
+const isIOS = () => {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+};
 
 const SharedYouTubePlayer = forwardRef(
   ({ videoId, start = 0, shouldPlay, onEnd, duration, volume = 100 }, ref) => {
     const timeoutRef = useRef(null);
     const fadeOutRef = useRef(null);
     const playerRef = useRef(null);
+    const [showIOSButton, setShowIOSButton] = useState(isIOS());
 
     const onReady = (event) => {
       playerRef.current = event.target;
       playerRef.current.setVolume(volume);
 
-      if (shouldPlay) {
-        playerRef.current.mute(); // Start muted to bypass autoplay restrictions
+      if (shouldPlay && !isIOS()) {
         playerRef.current.seekTo(start);
         playerRef.current.playVideo();
+      }
+    };
 
-        // Unmute after a short delay
-        setTimeout(() => {
-          playerRef.current.unMute();
-        }, 500);
+    const handleIOSPlay = () => {
+      if (playerRef.current) {
+        playerRef.current.seekTo(start);
+        playerRef.current.playVideo();
+        setShowIOSButton(false); // Hide the button after starting the video
       }
     };
 
@@ -66,20 +73,30 @@ const SharedYouTubePlayer = forwardRef(
     }, []);
 
     return (
-      <YouTube
-        videoId={videoId}
-        opts={{
-          height: "360",
-          width: "100%",
-          playerVars: {
-            autoplay: shouldPlay ? 1 : 0,
-            controls: 1,
-            start,
-          },
-        }}
-        onReady={onReady}
-        onStateChange={onStateChange}
-      />
+      <div className="relative">
+        {showIOSButton && (
+          <button
+            onClick={handleIOSPlay}
+            className="absolute inset-0 bg-black bg-opacity-50 text-white text-xl flex items-center justify-center z-10"
+          >
+            Start Song
+          </button>
+        )}
+        <YouTube
+          videoId={videoId}
+          opts={{
+            height: "360",
+            width: "100%",
+            playerVars: {
+              autoplay: shouldPlay ? 1 : 0,
+              controls: 1,
+              start,
+            },
+          }}
+          onReady={onReady}
+          onStateChange={onStateChange}
+        />
+      </div>
     );
   }
 );
