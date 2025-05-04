@@ -43,8 +43,8 @@ const App = () => {
         text,
         voice,
         {
-          rate: 0.9, // Slightly slower speech
-          pitch: 1.1, // Slightly higher pitch
+          rate: 1, // Slightly slower speech
+          pitch: 1, // Slightly higher pitch
           volume: 1, // Full volume
           onend: onEndCallback,
         }
