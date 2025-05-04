@@ -56,7 +56,7 @@ const App = () => {
 
   const handleAnnouncement = (player) => {
     // Announcement text excluding the name
-    const announcement = `Now batting, number ${player.batting_number}, playing ${player.position}.`;
+    const announcement = `Now batting, number ${player.jersey_number}, playing ${player.position}.`;
 
     // Map nationality to voice
     const voiceMap = {
