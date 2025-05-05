@@ -128,7 +128,9 @@ const EditSoundEffects = () => {
           {soundEffects.map((effect) => (
             <li key={effect.id} className="border p-4 rounded">
               <h2 className="font-bold">{effect.label}</h2>
-              <p className="text-sm text-gray-600">{effect.src}</p>
+              <p className="text-sm text-gray-600 truncate max-w-full overflow-hidden">
+                {effect.src}
+              </p>
               <audio controls className="my-2">
                 <source src={effect.src} type="audio/mpeg" />
               </audio>
