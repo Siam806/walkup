@@ -30,6 +30,12 @@ const MainPage = () => {
         >
           Edit Sound Effects
         </Link>
+        <Link
+          to="/documentation"
+          className="block p-6 bg-purple-600 text-white text-center rounded shadow hover:bg-purple-700"
+        >
+          Documentation
+        </Link>
       </div>
     </div>
   );

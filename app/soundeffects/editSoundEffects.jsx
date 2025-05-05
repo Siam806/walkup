@@ -85,7 +85,7 @@ const EditSoundEffects = () => {
   return (
     <div>
       <Navbar />
-      <div className="pt-20 p-4 sm:p-6 md:p-8">
+      <div style={{ paddingTop: "6.5rem" }} className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto">
         <h1 className="text-2xl font-bold mb-4">Manage Sound Effects</h1>
 
         <form onSubmit={handleSubmit} className="mb-6">

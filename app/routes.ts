@@ -7,5 +7,6 @@ export default [
     route("edit-player/:id", "./walkup/editPlayer.jsx"), // Edit Player page
     route("sound-effects", "./soundeffects/soundEffects.jsx"), // Sound Effects page
     route("edit-sound-effects", "./soundeffects/editSoundEffects.jsx"), // Edit Sound Effects page
+    route("documentation", "./routes/documentation.jsx"), // Add this route
     route("*", "./routes/notFoundPage.tsx"), // Catch-all route for unknown paths
 ] satisfies RouteConfig;

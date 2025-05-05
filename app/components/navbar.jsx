@@ -59,6 +59,13 @@ const Navbar = () => {
           >
             Edit Sound Effects
           </Link>
+          <Link
+            to="/documentation"
+            className="block md:inline px-4 py-2 md:p-0 hover:bg-gray-700 md:hover:bg-transparent"
+            onClick={() => setIsOpen(false)}
+          >
+            Documentation
+          </Link>
         </div>
       </div>
     </nav>

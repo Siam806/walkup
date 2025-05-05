@@ -4,10 +4,31 @@ import SharedYouTubePlayer from "../components/SharedYouTubePlayer";
 import { extractVideoId } from "../utils";
 import Navbar from "../components/navbar";
 
+const LOCAL_STORAGE_KEY = "walkup-inGamePlayers";
+
 const App = () => {
   const [players, setPlayers] = useState([]);
+  const [battingOrder, setBattingOrder] = useState([]);
   const [currentSong, setCurrentSong] = useState(null);
-  const playerRef = useRef(null); // Ref for controlling volume
+  const [inGamePlayers, setInGamePlayers] = useState([]);
+  const playerRef = useRef(null);
+
+  // Load inGamePlayers from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (stored) {
+      try {
+        setInGamePlayers(JSON.parse(stored));
+      } catch {
+        setInGamePlayers([]);
+      }
+    }
+  }, []);
+
+  // Save inGamePlayers to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(inGamePlayers));
+  }, [inGamePlayers]);
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -20,6 +41,7 @@ const App = () => {
         console.error("Error fetching players:", error);
       } else {
         setPlayers(data);
+        setBattingOrder(data.map((player, index) => ({ ...player, index })));
       }
     };
 
@@ -31,7 +53,7 @@ const App = () => {
     setCurrentSong({
       videoId,
       start: startTime || 0,
-      duration, // Pass null if no duration is provided
+      duration,
       volume,
     });
   };
@@ -43,17 +65,17 @@ const App = () => {
   ) => {
     if (window.responsiveVoice) {
       const enhancedText = text
-        .replace(/:\s*/g, ". ") // convert colons to pauses
-        .replace(/\.\s*/g, ". ") // ensure proper spacing after periods
-        .replace(/,/g, ", ") // ensure natural breaks at commas
-        .replace(/!+/g, ".") // reduce unnatural shouting tone
-        .replace(/\s+/g, " ") // normalize spacing
+        .replace(/:\s*/g, ". ")
+        .replace(/\.\s*/g, ". ")
+        .replace(/,/g, ", ")
+        .replace(/!+/g, ".")
+        .replace(/\s+/g, " ")
         .trim();
-  
+
       window.responsiveVoice.speak(enhancedText, voice, {
-        rate: 0.92,      // natural pace
-        pitch: 1.02,     // slightly expressive
-        volume: 1,       // max volume
+        rate: 0.92,
+        pitch: 1.02,
+        volume: 1,
         onend: onEndCallback,
       });
     } else {
@@ -75,7 +97,7 @@ const App = () => {
 
     const originalVolume = playerRef.current?.getVolume?.() ?? 100;
     if (playerRef.current?.setVolume) {
-      playerRef.current.setVolume(30); // Duck volume
+      playerRef.current.setVolume(30);
     }
     speakAnnouncement("Now batting...", "US English Male", () => {
       const mid = `Number ${player.jersey_number}, playing as ${player.position}.`;
@@ -83,7 +105,7 @@ const App = () => {
         const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
         speakAnnouncement(name, nativeVoice, () => {
           if (playerRef.current?.setVolume) {
-            playerRef.current.setVolume(originalVolume); // Restore volume
+            playerRef.current.setVolume(originalVolume);
           }
         });
       });
@@ -104,22 +126,16 @@ const App = () => {
     const englishVoice = "US English Male";
     const originalVolume = playerRef.current?.getVolume?.() ?? 100;
 
-    // Duck the volume before announcement
     if (playerRef.current?.setVolume) {
-      playerRef.current.setVolume(30); // Reduce volume for the announcement
+      playerRef.current.setVolume(30);
     }
 
-    // Start the announcement and music simultaneously
     speakAnnouncement("Now batting...", englishVoice, () => {
-      // Start the walk-up song immediately after starting the announcement
-      handlePlay(player.walk_up_song, player.walk_up_song_start, 15, 30); // Music starts immediately
-
-      // Continue the rest of the announcement
+      handlePlay(player.walk_up_song, player.walk_up_song_start, 15, 30);
       const middle = `Number ${player.jersey_number}, playing as ${player.position}.`;
       speakAnnouncement(middle, englishVoice, () => {
         const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
         speakAnnouncement(name, nativeVoice, () => {
-          // Restore volume after the announcement
           if (playerRef.current?.setVolume) {
             playerRef.current.setVolume(originalVolume);
           }
@@ -128,71 +144,171 @@ const App = () => {
     });
   };
 
+  // Batting order and in-game player logic
+  const movePlayerToEnd = (player) => {
+    setBattingOrder((prevOrder) => {
+      const updatedOrder = prevOrder.filter((p) => p.id !== player.id);
+      updatedOrder.push(player);
+      return updatedOrder;
+    });
+  };
+
+  const toggleInGamePlayer = (playerId) => {
+    setInGamePlayers((prev) =>
+      prev.includes(playerId)
+        ? prev.filter((id) => id !== playerId)
+        : [...prev, playerId]
+    );
+  };
+
+  const getSortedPlayers = () => {
+    const inGame = battingOrder.filter((player) => inGamePlayers.includes(player.id));
+    const reserve = battingOrder.filter((player) => !inGamePlayers.includes(player.id));
+    return { inGame, reserve };
+  };
+
+  const { inGame, reserve } = getSortedPlayers();
+
+  // Only reset the order of active players
+  const resetBattingOrder = () => {
+    // Get the original order of in-game players from the players array
+    const originalOrder = players
+      .filter((p) => inGamePlayers.includes(p.id))
+      .map((p) => p.id);
+    // Set battingOrder so in-game players are in original order, reserves unchanged
+    setBattingOrder([
+      ...players.filter((p) => inGamePlayers.includes(p.id)),
+      ...players.filter((p) => !inGamePlayers.includes(p.id)),
+    ]);
+    // Optionally, you can also reset inGamePlayers to preserve only the order
+    setInGamePlayers(originalOrder);
+  };
+
+  // Add a function to check if a player is currently playing a song
+  const isPlayerCurrent = (player) =>
+    currentSong && currentSong.videoId === extractVideoId(player.walk_up_song);
+
   return (
     <div>
       <Navbar />
-      <div className="pt-20 p-4 sm:p-6 md:p-8">
+      <div className="pt-28 p-4 sm:p-6 md:p-8 max-w-3xl mx-auto">
         <h1 className="text-xl sm:text-2xl font-bold mb-6">Team Walk-Up Songs</h1>
+        <button
+          onClick={resetBattingOrder}
+          className="mb-4 px-4 py-2 bg-red-500 text-white rounded"
+        >
+          Reset Batting Order
+        </button>
+        {/* Active Players */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {players.map((player) => (
+          {inGame.map((player) => (
             <div key={player.id} className="p-4 border rounded">
-              <h2 className="text-lg font-bold mb-2">
-                {player.first_name} "{player.nickname}" {player.last_name}
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold mb-2">
+                  {player.first_name} "{player.nickname}" {player.last_name}
+                </h2>
+                <input
+                  type="checkbox"
+                  checked={inGamePlayers.includes(player.id)}
+                  onChange={() => toggleInGamePlayer(player.id)}
+                  className="ml-2"
+                />
+              </div>
               <p>Jersey Number: {player.jersey_number}</p>
               <p>Batting Number: {player.batting_number}</p>
               <p>Position: {player.position}</p>
-              <button
-                onClick={() => handlePlay(player.walk_up_song, player.walk_up_song_start, 15)}
-                className="mt-2 px-4 py-2 bg-blue-500 text-white rounded w-full sm:w-auto"
-              >
-                Play Walk-Up Song (15s)
-              </button>
-              <button
-                onClick={() =>
-                  handlePlay(player.home_run_song, player.home_run_song_start) // No duration passed
-                }
-                className="mt-2 px-4 py-2 bg-green-700 text-white rounded w-full sm:w-auto"
-              >
-                Play Home Run Song
-              </button>
-              <button
-                onClick={() =>
-                  handlePlay(player.pitching_walk_up_song, player.pitching_walk_up_song_start, 30)
-                }
-                className="mt-2 px-4 py-2 bg-red-700 text-white rounded w-full sm:w-auto"
-              >
-                Play Pitching Walk-Up Song (30s)
-              </button>
-              <button
-                onClick={() => handleAnnouncement(player)}
-                className="mt-2 px-4 py-2 bg-yellow-500 text-white rounded w-full sm:w-auto"
-              >
-                Announce Player
-              </button>
-              <button
-                onClick={() => handleIntro(player)}
-                className="mt-2 px-4 py-2 bg-purple-600 text-white rounded w-full sm:w-auto"
-              >
-                Intro: Announce + Play Walk-Up
-              </button>
+              <>
+                <button
+                  onClick={() => handlePlay(player.walk_up_song, player.walk_up_song_start, 15)}
+                  className="mt-2 px-4 py-2 bg-blue-500 text-white rounded w-full sm:w-auto"
+                >
+                  Play Walk-Up Song (15s)
+                </button>
+                <button
+                  onClick={() =>
+                    handlePlay(player.home_run_song, player.home_run_song_start)
+                  }
+                  className="mt-2 px-4 py-2 bg-green-700 text-white rounded w-full sm:w-auto"
+                >
+                  Play Home Run Song
+                </button>
+                <button
+                  onClick={() =>
+                    handlePlay(player.pitching_walk_up_song, player.pitching_walk_up_song_start, 30)
+                  }
+                  className="mt-2 px-4 py-2 bg-red-700 text-white rounded w-full sm:w-auto"
+                >
+                  Play Pitching Walk-Up Song (30s)
+                </button>
+                <button
+                  onClick={() => handleAnnouncement(player)}
+                  className="mt-2 px-4 py-2 bg-yellow-500 text-white rounded w-full sm:w-auto"
+                >
+                  Announce Player
+                </button>
+                <button
+                  onClick={() => handleIntro(player)}
+                  className="mt-2 px-4 py-2 bg-purple-600 text-white rounded w-full sm:w-auto"
+                >
+                  Intro: Announce + Play Walk-Up
+                </button>
+                <button
+                  onClick={() => movePlayerToEnd(player)}
+                  className="mt-2 px-4 py-2 bg-gray-500 text-white rounded w-full sm:w-auto"
+                >
+                  Move to End
+                </button>
+              </>
+              {/* Show YouTube player directly under this player if their song is playing */}
+              {currentSong &&
+                currentSong.videoId === extractVideoId(player.walk_up_song) && (
+                  <div className="mt-4">
+                    <SharedYouTubePlayer
+                      ref={playerRef}
+                      key={currentSong.videoId}
+                      videoId={currentSong.videoId}
+                      start={currentSong.start}
+                      shouldPlay={true}
+                      duration={currentSong.duration}
+                      volume={currentSong.volume}
+                      onEnd={() => setCurrentSong(null)}
+                    />
+                  </div>
+                )}
             </div>
           ))}
         </div>
 
-        {currentSong && (
-          <div className="mt-8">
-            <SharedYouTubePlayer
-              ref={playerRef}
-              key={currentSong.videoId}
-              videoId={currentSong.videoId}
-              start={currentSong.start}
-              shouldPlay={true}
-              duration={currentSong.duration}
-              volume={currentSong.volume}
-              onEnd={() => setCurrentSong(null)}
-            />
-          </div>
+        {/* Separator for Reserve Players */}
+        {reserve.length > 0 && (
+          <>
+            <div className="my-8 border-t border-gray-400 text-center relative">
+              <span className="bg-white px-4 text-gray-600 absolute left-1/2 -translate-x-1/2 -top-3 font-semibold">
+                Reserve Players
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {reserve.map((player) => (
+                <div key={player.id} className="p-4 border rounded opacity-70">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold mb-2">
+                      {player.first_name} "{player.nickname}" {player.last_name}
+                    </h2>
+                    <input
+                      type="checkbox"
+                      checked={inGamePlayers.includes(player.id)}
+                      onChange={() => toggleInGamePlayer(player.id)}
+                      className="ml-2"
+                    />
+                  </div>
+                  <p>Jersey Number: {player.jersey_number}</p>
+                  <p>Batting Number: {player.batting_number}</p>
+                  <p>Position: {player.position}</p>
+                  {/* No action buttons for reserve players */}
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
