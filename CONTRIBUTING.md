@@ -22,7 +22,7 @@ Please read the following guidelines to make the process smooth for everyone.
     ```
 ---
 
-##Code Style
+## Code Style
 -   Use Prettier and ESLint for formatting and linting.
 -   Use functional React components and hooks.
 -   Use TypeScript for new files when possible.
@@ -30,7 +30,7 @@ Please read the following guidelines to make the process smooth for everyone.
 
 ---
 
-##Making Changes
+## Making Changes
 -   Create a new branch for your feature or bugfix:
 ```bash
 git checkout -b feature/my-feature
@@ -40,7 +40,7 @@ git checkout -b feature/my-feature
 
 ---
 
-##Testing
+## Testing
 -   Please add or update tests for your changes if possible.
 -   Run tests before submitting:
 ```bash
@@ -50,7 +50,7 @@ npm run test
 
 ---
 
-##Pull Requests
+## Pull Requests
 -   Push your branch and open a pull request against main.
 -   Describe your changes and reference any related issues.
 -   Ensure your code passes linting and type checks:
@@ -62,13 +62,13 @@ npm run typecheck
 
 ---
 
-##Environment & Security
+## Environment & Security
 -   Never commit secrets or API keys directly to the repo.
 -   Use environment variables for all sensitive data.
 
 ---
 
-##Need Help?
+## Need Help?
 If you have questions, open an issue or ask in the discussions tab.
 
 Thank you for contributing!
