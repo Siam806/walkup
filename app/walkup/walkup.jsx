@@ -48,13 +48,15 @@ const App = () => {
     fetchPlayers();
   }, []);
 
-  const handlePlay = (songUrl, startTime, duration = null, volume = 100) => {
+  const handlePlay = (songUrl, startTime, duration = null, volume = 100, songType = "walkup", playerId = null) => {
     const videoId = extractVideoId(songUrl);
     setCurrentSong({
       videoId,
       start: startTime || 0,
       duration,
       volume,
+      songType,
+      playerId,
     });
   };
 
@@ -130,8 +132,17 @@ const App = () => {
       playerRef.current.setVolume(30);
     }
 
+    // Start the music at 30% volume
+    handlePlay(
+      player.walk_up_song,
+      player.walk_up_song_start,
+      15,
+      30, // <-- set initial volume to 30%
+      "walkup",
+      player.id
+    );
+
     speakAnnouncement("Now batting...", englishVoice, () => {
-      handlePlay(player.walk_up_song, player.walk_up_song_start, 15, 30);
       const middle = `Number ${player.jersey_number}, playing as ${player.position}.`;
       speakAnnouncement(middle, englishVoice, () => {
         const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
@@ -219,14 +230,14 @@ const App = () => {
               <p>Position: {player.position}</p>
               <>
                 <button
-                  onClick={() => handlePlay(player.walk_up_song, player.walk_up_song_start, 15)}
+                  onClick={() => handlePlay(player.walk_up_song, player.walk_up_song_start, 15, 100, "walkup", player.id)}
                   className="mt-2 px-4 py-2 bg-blue-500 text-white rounded w-full sm:w-auto"
                 >
                   Play Walk-Up Song (15s)
                 </button>
                 <button
                   onClick={() =>
-                    handlePlay(player.home_run_song, player.home_run_song_start)
+                    handlePlay(player.home_run_song, player.home_run_song_start, null, 100, "home_run", player.id)
                   }
                   className="mt-2 px-4 py-2 bg-green-700 text-white rounded w-full sm:w-auto"
                 >
@@ -234,7 +245,7 @@ const App = () => {
                 </button>
                 <button
                   onClick={() =>
-                    handlePlay(player.pitching_walk_up_song, player.pitching_walk_up_song_start, 30)
+                    handlePlay(player.pitching_walk_up_song, player.pitching_walk_up_song_start, 30, 100, "pitching", player.id)
                   }
                   className="mt-2 px-4 py-2 bg-red-700 text-white rounded w-full sm:w-auto"
                 >
@@ -261,11 +272,12 @@ const App = () => {
               </>
               {/* Show YouTube player directly under this player if their song is playing */}
               {currentSong &&
-                currentSong.videoId === extractVideoId(player.walk_up_song) && (
+                currentSong.playerId === player.id &&
+                (
                   <div className="mt-4">
                     <SharedYouTubePlayer
                       ref={playerRef}
-                      key={currentSong.videoId}
+                      key={currentSong.videoId + currentSong.songType}
                       videoId={currentSong.videoId}
                       start={currentSong.start}
                       shouldPlay={true}
