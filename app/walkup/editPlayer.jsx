@@ -169,6 +169,19 @@ const EditPlayer = () => {
             placeholder="Pitching Walk-Up Song Start Time (seconds)"
             className="p-2 border rounded"
           />
+          <select
+            name="nationality"
+            value={form.nationality || "US"}
+            onChange={handleChange}
+            className="p-2 border rounded bg-gray-100 text-gray-800"
+          >
+            <option value="US">United States</option>
+            <option value="TH">Thailand</option>
+            <option value="JP">Japan</option>
+            <option value="UK">United Kingdom</option>
+            <option value="FR">France</option>
+            <option value="DE">Germany</option>
+          </select>
         </div>
         <button
           type="submit"
