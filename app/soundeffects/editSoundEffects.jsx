@@ -1,22 +1,72 @@
 import React, { useState, useEffect } from "react";
 import Navbar from "../components/navbar";
 import { supabase } from "../supabaseClient";
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../components/AuthProvider';
+
+// Helper function to log activity
+const logActivity = async (userId, email, action, details) => {
+  try {
+    const { error } = await supabase.from("activity_logs").insert([{
+      user_id: userId,
+      email: email,
+      action: action,
+      details: details,
+      timestamp: new Date().toISOString(),
+    }]);
+    
+    if (error) {
+      console.error("Error logging activity:", error);
+    }
+  } catch (err) {
+    console.error("Failed to log activity:", err);
+  }
+};
 
 const EditSoundEffects = () => {
   const [form, setForm] = useState({ id: null, label: "", src: "" });
   const [soundEffects, setSoundEffects] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
+  const [componentLoading, setComponentLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    // Only fetch data when auth is determined
+    if (authLoading) return;
+    
+    const fetchSoundEffects = async () => {
+      setComponentLoading(true);
+      try {
+        const { data, error } = await supabase.from("sound_effects").select("*");
+        if (error) {
+          console.error("Error fetching sound effects:", error);
+          setError(`Error fetching sound effects: ${error.message}`);
+        } else {
+          setSoundEffects(data);
+          setError(null);
+        }
+      } catch (err) {
+        console.error("Unexpected error:", err);
+        setError("An unexpected error occurred");
+      } finally {
+        setComponentLoading(false);
+      }
+    };
+    
     fetchSoundEffects();
-  }, []);
+  }, [user, authLoading]); // Added proper dependencies
 
   const fetchSoundEffects = async () => {
-    const { data, error } = await supabase.from("sound_effects").select("*");
-    if (error) {
-      console.error("Error fetching sound effects:", error);
-    } else {
-      setSoundEffects(data);
+    try {
+      const { data, error } = await supabase.from("sound_effects").select("*");
+      if (error) {
+        console.error("Error fetching sound effects:", error);
+      } else {
+        setSoundEffects(data);
+      }
+    } catch (err) {
+      console.error("Unexpected error refreshing sound effects:", err);
     }
   };
 
@@ -42,6 +92,14 @@ const EditSoundEffects = () => {
       if (error) {
         console.error("Error updating sound effect:", error);
       } else {
+        // Log the update activity
+        await logActivity(
+          user.id,
+          user.email,
+          "UPDATE_SOUND_EFFECT",
+          `Updated sound effect: ${form.label} (ID: ${form.id})`
+        );
+
         alert("Sound effect updated!");
         setIsEditing(false);
         setForm({ id: null, label: "", src: "" });
@@ -51,12 +109,20 @@ const EditSoundEffects = () => {
       const { data, error } = await supabase.from("sound_effects").insert([{
         label: form.label,
         src: form.src,
-      }]);
+      }]).select();
 
       if (error) {
         console.error("Error adding sound effect:", error);
         alert("Failed to add sound.");
       } else {
+        // Log the create activity
+        await logActivity(
+          user.id,
+          user.email,
+          "CREATE_SOUND_EFFECT",
+          `Created sound effect: ${form.label}`
+        );
+
         setForm({ id: null, label: "", src: "" });
         fetchSoundEffects();
       }
@@ -74,19 +140,45 @@ const EditSoundEffects = () => {
   };
 
   const handleDelete = async (id) => {
+    // Find the sound effect to include details in the log
+    const soundEffectToDelete = soundEffects.find(effect => effect.id === id);
+
     const { error } = await supabase.from("sound_effects").delete().eq("id", id);
     if (error) {
       console.error("Error deleting sound effect:", error);
     } else {
+      // Log the delete activity
+      await logActivity(
+        user.id,
+        user.email,
+        "DELETE_SOUND_EFFECT",
+        `Deleted sound effect: ${soundEffectToDelete?.label || 'Unknown'} (ID: ${id})`
+      );
+
       fetchSoundEffects();
     }
   };
+
+  // Add proper loading and auth check
+  if (authLoading || componentLoading) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/signin" replace />;
+  }
 
   return (
     <div>
       <Navbar />
       <div style={{ paddingTop: "6.5rem" }} className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto">
         <h1 className="text-2xl font-bold mb-4">Manage Sound Effects</h1>
+        
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="mb-6">
           <input

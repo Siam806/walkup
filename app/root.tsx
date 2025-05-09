@@ -6,6 +6,8 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
+// Change this import to use the default export
+import AuthProvider from "./components/AuthProvider";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -31,7 +33,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
-        {/* ✅ Add ResponsiveVoice here */}
+        {/* Add ResponsiveVoice here */}
         <script
           src="https://code.responsivevoice.org/responsivevoice.js?key=LPheIFLY"
           async
@@ -46,9 +48,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-
 export default function App() {
-  return <Outlet />;
+  return (
+    <AuthProvider>
+      <Outlet />
+    </AuthProvider>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

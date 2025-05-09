@@ -2,34 +2,48 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import Navbar from "../components/navbar";
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../components/AuthProvider';
 
 const EditPlayer = () => {
-  const { id } = useParams(); // Get the player ID from the URL
+  const { id } = useParams();
   const navigate = useNavigate();
-  const [form, setForm] = useState(null); // Initialize as null to handle loading state
-  const [loading, setLoading] = useState(true); // Loading state for fetching data
-  const [error, setError] = useState(null); // Error state for handling fetch errors
+  const [form, setForm] = useState(null);
+  const [componentLoading, setComponentLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { user, loading: authLoading } = useAuth(); // Get loading state from auth context
 
-  // Fetch the player data when the component loads
   useEffect(() => {
+    // Only fetch data when auth is determined and we have a user
     const fetchPlayer = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("players")
-        .select("*")
-        .eq("id", id)
-        .single();
+      if (authLoading) return;
+      
+      setComponentLoading(true); // Use componentLoading instead of loading
+      try {
+        // Get player data
+        const { data, error } = await supabase
+          .from("players")
+          .select("*")
+          .eq("id", id)
+          .single();
 
-      if (error) {
-        setError(`Error fetching player: ${error.message}`);
-      } else {
-        setForm(data);
+        if (error) {
+          setError(`Error fetching player: ${error.message}`);
+        } else if (user && user.id !== data.user_id) {
+          setError("Not authorized to edit this player");
+        } else {
+          setForm(data);
+        }
+      } catch (err) {
+        console.error("Error:", err);
+        setError("An unexpected error occurred");
+      } finally {
+        setComponentLoading(false); // Use componentLoading instead of loading
       }
-      setLoading(false);
     };
 
     fetchPlayer();
-  }, [id]);
+  }, [id, user, authLoading]); // Changed loading to authLoading
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -51,16 +65,36 @@ const EditPlayer = () => {
     }
   };
 
-  if (loading) {
-    return <p>Loading player data...</p>;
+  if (authLoading || componentLoading) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/signin" replace />;
   }
 
   if (error) {
-    return <p>{error}</p>;
+    return (
+      <div>
+        <Navbar />
+        <div style={{ paddingTop: "6.5rem" }} className="p-4">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!form) {
-    return <p>Player not found.</p>;
+    return (
+      <div>
+        <Navbar />
+        <div style={{ paddingTop: "6.5rem" }} className="p-4">
+          <p>Player not found.</p>
+        </div>
+      </div>
+    );
   }
 
   return (
