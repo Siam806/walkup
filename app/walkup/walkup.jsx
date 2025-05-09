@@ -5,6 +5,7 @@ import { extractVideoId } from "../utils";
 import Navbar from "../components/navbar";
 
 const LOCAL_STORAGE_KEY = "walkup-inGamePlayers";
+const ANNOUNCEMENT_PREFS_KEY = "walkup-announcement-prefs";
 
 const App = () => {
   const [players, setPlayers] = useState([]);
@@ -12,6 +13,14 @@ const App = () => {
   const [currentSong, setCurrentSong] = useState(null);
   const [inGamePlayers, setInGamePlayers] = useState([]);
   const playerRef = useRef(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  // Default announcement preferences
+  const [announcementPrefs, setAnnouncementPrefs] = useState({
+    includeVoiceIntro: true,
+    includeJerseyNumber: true,
+    includePosition: true,
+  });
 
   // Load inGamePlayers from localStorage on mount
   useEffect(() => {
@@ -23,12 +32,27 @@ const App = () => {
         setInGamePlayers([]);
       }
     }
+
+    // Load announcement preferences
+    const storedPrefs = localStorage.getItem(ANNOUNCEMENT_PREFS_KEY);
+    if (storedPrefs) {
+      try {
+        setAnnouncementPrefs(JSON.parse(storedPrefs));
+      } catch {
+        // Keep defaults if parsing fails
+      }
+    }
   }, []);
 
   // Save inGamePlayers to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(inGamePlayers));
   }, [inGamePlayers]);
+
+  // Save announcement preferences to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem(ANNOUNCEMENT_PREFS_KEY, JSON.stringify(announcementPrefs));
+  }, [announcementPrefs]);
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -96,22 +120,55 @@ const App = () => {
     };
 
     const nativeVoice = voiceMap[player.nationality] || "US English Male";
+    const englishVoice = "US English Male";
 
     const originalVolume = playerRef.current?.getVolume?.() ?? 100;
     if (playerRef.current?.setVolume) {
       playerRef.current.setVolume(30);
     }
-    speakAnnouncement("Now batting...", "US English Male", () => {
-      const mid = `Number ${player.jersey_number}, playing as ${player.position}.`;
-      speakAnnouncement(mid, "US English Male", () => {
-        const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
-        speakAnnouncement(name, nativeVoice, () => {
-          if (playerRef.current?.setVolume) {
-            playerRef.current.setVolume(originalVolume);
-          }
-        });
+
+    if (announcementPrefs.includeVoiceIntro) {
+      speakAnnouncement("Now batting...", englishVoice, () => {
+        // Construct middle announcement parts based on preferences
+        let middle = "";
+        if (announcementPrefs.includeJerseyNumber) {
+          middle += `Number ${player.jersey_number}`;
+        }
+
+        if (announcementPrefs.includePosition && announcementPrefs.includeJerseyNumber) {
+          middle += `, playing as ${player.position}`;
+        } else if (announcementPrefs.includePosition) {
+          middle += `Playing as ${player.position}`;
+        }
+
+        if (middle) {
+          speakAnnouncement(middle, englishVoice, () => {
+            const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
+            speakAnnouncement(name, nativeVoice, () => {
+              if (playerRef.current?.setVolume) {
+                playerRef.current.setVolume(originalVolume);
+              }
+            });
+          });
+        } else {
+          // Skip middle announcement if no parts are selected
+          const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
+          speakAnnouncement(name, nativeVoice, () => {
+            if (playerRef.current?.setVolume) {
+              playerRef.current.setVolume(originalVolume);
+            }
+          });
+        }
       });
-    });
+    } else {
+      // Only announce the name if voice intro is disabled
+      const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
+      speakAnnouncement(name, nativeVoice, () => {
+        if (playerRef.current?.setVolume) {
+          playerRef.current.setVolume(originalVolume);
+        }
+      });
+    }
   };
 
   const handleIntro = (player) => {
@@ -142,17 +199,47 @@ const App = () => {
       player.id
     );
 
-    speakAnnouncement("Now batting...", englishVoice, () => {
-      const middle = `Number ${player.jersey_number}, playing as ${player.position}.`;
-      speakAnnouncement(middle, englishVoice, () => {
-        const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
-        speakAnnouncement(name, nativeVoice, () => {
-          if (playerRef.current?.setVolume) {
-            playerRef.current.setVolume(originalVolume);
-          }
-        });
+    if (announcementPrefs.includeVoiceIntro) {
+      speakAnnouncement("Now batting...", englishVoice, () => {
+        // Construct middle announcement parts based on preferences
+        let middle = "";
+        if (announcementPrefs.includeJerseyNumber) {
+          middle += `Number ${player.jersey_number}`;
+        }
+
+        if (announcementPrefs.includePosition && announcementPrefs.includeJerseyNumber) {
+          middle += `, playing as ${player.position}`;
+        } else if (announcementPrefs.includePosition) {
+          middle += `Playing as ${player.position}`;
+        }
+
+        if (middle) {
+          speakAnnouncement(middle, englishVoice, () => {
+            const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
+            speakAnnouncement(name, nativeVoice, () => {
+              if (playerRef.current?.setVolume) {
+                playerRef.current.setVolume(originalVolume);
+              }
+            });
+          });
+        } else {
+          // Skip middle announcement if no parts are selected
+          const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
+          speakAnnouncement(name, nativeVoice, () => {
+            if (playerRef.current?.setVolume) {
+              playerRef.current.setVolume(originalVolume);
+            }
+          });
+        }
       });
-    });
+    } else {
+      // Just play the walkup song without voice introduction
+      setTimeout(() => {
+        if (playerRef.current?.setVolume) {
+          playerRef.current.setVolume(originalVolume);
+        }
+      }, 2000); // Give it 2 seconds before restoring volume
+    }
   };
 
   // Batting order and in-game player logic
@@ -199,17 +286,141 @@ const App = () => {
   const isPlayerCurrent = (player) =>
     currentSong && currentSong.videoId === extractVideoId(player.walk_up_song);
 
+  // Settings Modal Component
+  const AnnouncementSettingsModal = () => (
+    <div className="fixed inset-0 bg-gray-800 bg-opacity-75 z-50 flex items-center justify-center">
+      <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Announcement Settings</h2>
+          <button 
+            onClick={() => setShowSettingsModal(false)}
+            className="text-gray-600 hover:text-gray-800"
+          >
+            ✕
+          </button>
+        </div>
+        
+        <div className="space-y-4">
+          {/* Voice Introduction Option */}
+          <div className="flex items-center p-3 hover:bg-gray-50 rounded border border-gray-100">
+            <input
+              type="checkbox"
+              id="includeVoiceIntro"
+              checked={announcementPrefs.includeVoiceIntro}
+              onChange={e => setAnnouncementPrefs(prev => ({
+                ...prev,
+                includeVoiceIntro: e.target.checked
+              }))}
+              className="mr-3 h-5 w-5 accent-blue-500"
+            />
+            <div>
+              <label htmlFor="includeVoiceIntro" className="font-medium text-gray-500">Include Voice Introduction</label>
+              <p className="text-sm text-gray-500">Announces "Now batting" before the player's name</p>
+            </div>
+          </div>
+          
+          {/* Jersey Number Option */}
+          <div className={`flex items-center p-3 rounded border ${!announcementPrefs.includeVoiceIntro 
+            ? 'bg-gray-100 border-gray-200' 
+            : 'hover:bg-gray-50 border-gray-100'}`}
+          >
+            <input
+              type="checkbox"
+              id="includeJerseyNumber"
+              checked={announcementPrefs.includeJerseyNumber}
+              onChange={e => setAnnouncementPrefs(prev => ({
+                ...prev,
+                includeJerseyNumber: e.target.checked
+              }))}
+              disabled={!announcementPrefs.includeVoiceIntro}
+              className="mr-3 h-5 w-5 accent-blue-500"
+            />
+            <div>
+              <label 
+                htmlFor="includeJerseyNumber" 
+                className={
+                  !announcementPrefs.includeVoiceIntro 
+                    ? "font-medium text-gray-500" 
+                    : "font-medium text-gray-700"
+                }
+              >
+                Announce Jersey Number
+              </label>
+              <p className={`text-sm ${!announcementPrefs.includeVoiceIntro ? "text-gray-400" : "text-gray-500"}`}>
+                Includes "Number [X]" in the announcement
+              </p>
+            </div>
+          </div>
+          
+          {/* Position Option */}
+          <div className={`flex items-center p-3 rounded border ${!announcementPrefs.includeVoiceIntro 
+            ? 'bg-gray-100 border-gray-200' 
+            : 'hover:bg-gray-50 border-gray-100'}`}
+          >
+            <input
+              type="checkbox"
+              id="includePosition"
+              checked={announcementPrefs.includePosition}
+              onChange={e => setAnnouncementPrefs(prev => ({
+                ...prev,
+                includePosition: e.target.checked
+              }))}
+              disabled={!announcementPrefs.includeVoiceIntro}
+              className="mr-3 h-5 w-5 accent-blue-500"
+            />
+            <div>
+              <label 
+                htmlFor="includePosition"
+                className={
+                  !announcementPrefs.includeVoiceIntro 
+                    ? "font-medium text-gray-500" 
+                    : "font-medium text-gray-700"
+                }
+              >
+                Announce Position
+              </label>
+              <p className={`text-sm ${!announcementPrefs.includeVoiceIntro ? "text-gray-400" : "text-gray-500"}`}>
+                Includes "playing as [position]" in the announcement
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-6 flex justify-end">
+          <button
+            onClick={() => setShowSettingsModal(false)}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+          >
+            Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div>
       <Navbar />
-      <div className="pt-28 p-4 sm:p-6 md:p-8 max-w-3xl mx-auto">
-        <h1 className="text-xl sm:text-2xl font-bold mb-6">Team Walk-Up Songs</h1>
-        <button
-          onClick={resetBattingOrder}
-          className="mb-4 px-4 py-2 bg-red-500 text-white rounded"
-        >
-          Reset Batting Order
-        </button>
+      <div className="h-16"></div> {/* This matches the h-16 in your navbar */}
+      <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+          <h1 className="text-xl sm:text-2xl font-bold">Team Walk-Up Songs</h1>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={resetBattingOrder}
+              className="px-4 py-2 bg-red-500 text-white rounded"
+            >
+              Reset Batting Order
+            </button>
+            <button 
+              onClick={() => setShowSettingsModal(true)}
+              className="px-4 py-2 bg-gray-600 text-white rounded"
+            >
+              <span className="mr-2">⚙️</span> Settings
+            </button>
+          </div>
+        </div>
+        
         {/* Active Players */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {inGame.map((player) => (
@@ -230,10 +441,10 @@ const App = () => {
               <p>Position: {player.position}</p>
               <>
                 <button
-                  onClick={() => handlePlay(player.walk_up_song, player.walk_up_song_start, 15, 100, "walkup", player.id)}
+                  onClick={() => handleIntro(player)}
                   className="mt-2 px-4 py-2 bg-blue-500 text-white rounded w-full sm:w-auto"
                 >
-                  Play Walk-Up Song (15s)
+                  Play Walk-Up Song
                 </button>
                 <button
                   onClick={() =>
@@ -249,7 +460,7 @@ const App = () => {
                   }
                   className="mt-2 px-4 py-2 bg-red-700 text-white rounded w-full sm:w-auto"
                 >
-                  Play Pitching Walk-Up Song (30s)
+                  Play Pitching Walk-Up (30s)
                 </button>
                 <button
                   onClick={() => handleAnnouncement(player)}
@@ -258,40 +469,32 @@ const App = () => {
                   Announce Player
                 </button>
                 <button
-                  onClick={() => handleIntro(player)}
-                  className="mt-2 px-4 py-2 bg-purple-600 text-white rounded w-full sm:w-auto"
-                >
-                  Intro: Announce + Play Walk-Up
-                </button>
-                <button
                   onClick={() => movePlayerToEnd(player)}
                   className="mt-2 px-4 py-2 bg-gray-500 text-white rounded w-full sm:w-auto"
                 >
                   Move to End
                 </button>
               </>
-              {/* Show YouTube player directly under this player if their song is playing */}
-              {currentSong &&
-                currentSong.playerId === player.id &&
-                (
-                  <div className="mt-4">
-                    <SharedYouTubePlayer
-                      ref={playerRef}
-                      key={currentSong.videoId + currentSong.songType}
-                      videoId={currentSong.videoId}
-                      start={currentSong.start}
-                      shouldPlay={true}
-                      duration={currentSong.duration}
-                      volume={currentSong.volume}
-                      onEnd={() => setCurrentSong(null)}
-                    />
-                  </div>
-                )}
+              {/* YouTube player */}
+              {currentSong && currentSong.playerId === player.id && (
+                <div className="mt-4">
+                  <SharedYouTubePlayer
+                    ref={playerRef}
+                    key={currentSong.videoId + currentSong.songType}
+                    videoId={currentSong.videoId}
+                    start={currentSong.start}
+                    shouldPlay={true}
+                    duration={currentSong.duration}
+                    volume={currentSong.volume}
+                    onEnd={() => setCurrentSong(null)}
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
 
-        {/* Separator for Reserve Players */}
+        {/* Reserve Players section remains unchanged */}
         {reserve.length > 0 && (
           <>
             <div className="my-8 border-t border-gray-400 text-center relative">
@@ -316,13 +519,15 @@ const App = () => {
                   <p>Jersey Number: {player.jersey_number}</p>
                   <p>Batting Number: {player.batting_number}</p>
                   <p>Position: {player.position}</p>
-                  {/* No action buttons for reserve players */}
                 </div>
               ))}
             </div>
           </>
         )}
       </div>
+      
+      {/* Settings Modal */}
+      {showSettingsModal && <AnnouncementSettingsModal />}
     </div>
   );
 };
