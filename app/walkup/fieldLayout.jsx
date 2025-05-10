@@ -9,8 +9,8 @@ import BaseballField from '../components/BaseballField';
 import { useAuth } from '../components/AuthProvider';
 import { Navigate } from 'react-router-dom';
 
-// Player component that can be dragged
-const DraggablePlayer = ({ player, isAssigned }) => {
+// Player component that can be dragged (desktop) or clicked (mobile)
+const DraggablePlayer = ({ player, isAssigned, isMobile, onPlayerClick }) => {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: player.id,
     data: {
@@ -18,20 +18,27 @@ const DraggablePlayer = ({ player, isAssigned }) => {
     },
   });
   
-  const style = transform ? {
+  const style = transform && !isMobile ? {
     transform: CSS.Translate.toString(transform),
   } : undefined;
 
+  // For mobile, use onClick event instead of drag
+  const handleClick = () => {
+    if (isMobile) {
+      onPlayerClick(player);
+    }
+  };
+
   return (
     <div 
-      ref={setNodeRef} 
+      ref={!isMobile ? setNodeRef : undefined}
       style={style} 
-      {...listeners} 
-      {...attributes}
-      className={`cursor-grab active:cursor-grabbing p-2 mb-2 rounded-lg border ${
+      {...(!isMobile ? { ...listeners, ...attributes } : {})}
+      onClick={handleClick}
+      className={`${isMobile ? '' : 'cursor-grab active:cursor-grabbing'} p-2 mb-2 rounded-lg border ${
         isAssigned 
           ? 'bg-gray-100 border-gray-300 text-gray-700' 
-          : 'bg-white border-blue-300 text-gray-800'
+          : `bg-white border-blue-300 text-gray-800 ${isMobile ? 'active:bg-blue-100 hover:bg-blue-50' : ''}`
       }`}
     >
       <div className="font-bold">{player.first_name} {player.last_name}</div>
@@ -41,7 +48,7 @@ const DraggablePlayer = ({ player, isAssigned }) => {
 };
 
 // Drop zone for each position on the field
-const PositionDropZone = ({ position, positionKey, currentPlayer, onRemovePlayer, positionLabels }) => {
+const PositionDropZone = ({ position, positionKey, currentPlayer, onRemovePlayer, positionLabels, isMobile, onPositionClick, isSelected }) => {
   const { isOver, setNodeRef } = useDroppable({
     id: positionKey,
     data: {
@@ -49,7 +56,12 @@ const PositionDropZone = ({ position, positionKey, currentPlayer, onRemovePlayer
     },
   });
   
-  // Adjust position coordinates for better placement on the enhanced field
+  const handleClick = () => {
+    if (isMobile) {
+      onPositionClick(positionKey);
+    }
+  };
+  
   const positionMap = {
     P: { top: '45%', left: '50%', transform: 'translate(-50%, -50%)' },
     C: { bottom: '8%', left: '50%', transform: 'translate(-50%, 0)' },
@@ -66,24 +78,34 @@ const PositionDropZone = ({ position, positionKey, currentPlayer, onRemovePlayer
   
   return (
     <div
-      ref={setNodeRef}
+      ref={!isMobile ? setNodeRef : undefined}
       style={positionStyle}
+      onClick={handleClick}
       className={`absolute w-24 h-20 flex items-center justify-center rounded-lg transition-colors ${
         isOver 
           ? 'bg-blue-500 bg-opacity-70 border-2 border-white shadow-lg' 
-          : currentPlayer 
-            ? 'bg-blue-300 bg-opacity-70' 
-            : 'border border-dashed border-white border-opacity-70 hover:bg-blue-900 hover:bg-opacity-20'
+          : isSelected
+            ? 'bg-yellow-400 bg-opacity-70 border-2 border-yellow-600 shadow-lg'
+            : currentPlayer 
+              ? 'bg-blue-300 bg-opacity-70' 
+              : 'border border-dashed border-white border-opacity-70 hover:bg-blue-900 hover:bg-opacity-20'
       }`}
     >
       {/* Show a hint text when hovering with a player */}
-      {isOver && !currentPlayer && (
+      {isOver && !currentPlayer && !isMobile && (
         <div className="absolute text-white text-xs font-bold bg-black bg-opacity-70 px-2 py-1 rounded animate-pulse">
           Drop here
         </div>
       )}
       
-      {!currentPlayer && !isOver && (
+      {/* For mobile, show "Click to select" text when position is selected */}
+      {isMobile && isSelected && !currentPlayer && (
+        <div className="absolute text-white text-xs font-bold bg-black bg-opacity-70 px-2 py-1 rounded animate-pulse">
+          Select player
+        </div>
+      )}
+      
+      {!currentPlayer && !isOver && !isSelected && (
         <div className="absolute text-white text-xs font-medium bg-black bg-opacity-40 px-2 py-1 rounded opacity-80">
           {positionLabels[positionKey]}
         </div>
@@ -99,7 +121,10 @@ const PositionDropZone = ({ position, positionKey, currentPlayer, onRemovePlayer
               <div className="text-xs text-gray-700">#{currentPlayer.jersey_number}</div>
             </div>
             <button 
-              onClick={() => onRemovePlayer(positionKey, currentPlayer.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemovePlayer(positionKey, currentPlayer.id);
+              }}
               className="ml-1 text-red-500 text-xs p-1 hover:bg-red-50 rounded-full"
             >
               ✕
@@ -112,7 +137,7 @@ const PositionDropZone = ({ position, positionKey, currentPlayer, onRemovePlayer
 };
 
 // DH Drop Zone component
-const DHDropZone = ({ player, onRemovePlayer }) => {
+const DHDropZone = ({ player, onRemovePlayer, isMobile, onPositionClick, isSelected }) => {
   const { isOver, setNodeRef } = useDroppable({
     id: 'DH',
     data: {
@@ -120,15 +145,24 @@ const DHDropZone = ({ player, onRemovePlayer }) => {
     },
   });
 
+  const handleClick = () => {
+    if (isMobile) {
+      onPositionClick('DH');
+    }
+  };
+
   return (
     <div 
-      ref={setNodeRef}
+      ref={!isMobile ? setNodeRef : undefined}
+      onClick={handleClick}
       className={`h-full w-full rounded-lg ${
         isOver 
           ? 'bg-blue-500' 
-          : player 
-            ? 'bg-blue-200' 
-            : 'bg-gray-200 border-2 border-dashed border-gray-400'
+          : isSelected
+            ? 'bg-yellow-400' 
+            : player 
+              ? 'bg-blue-200' 
+              : 'bg-gray-200 border-2 border-dashed border-gray-400'
       }`}
     >
       {player ? (
@@ -138,7 +172,10 @@ const DHDropZone = ({ player, onRemovePlayer }) => {
             <div className="text-xs text-gray-600">#{player.jersey_number}</div>
           </div>
           <button 
-            onClick={() => onRemovePlayer('DH', player.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemovePlayer('DH', player.id);
+            }}
             className="text-red-500 p-1 hover:bg-red-50 rounded-full"
           >
             ✕
@@ -146,7 +183,7 @@ const DHDropZone = ({ player, onRemovePlayer }) => {
         </div>
       ) : (
         <div className="text-center text-gray-600 h-full flex items-center justify-center font-medium">
-          Drop player here for DH
+          {isSelected && isMobile ? "Select player below" : "Drop player here for DH"}
         </div>
       )}
     </div>
@@ -168,7 +205,21 @@ const FieldLayout = () => {
     DH: null
   });
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState(null);
   const { user, loading: authLoading } = useAuth();
+
+  // Check window width on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768); // Set mobile mode under 768px
+    };
+    
+    checkMobile();
+    
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -257,6 +308,7 @@ const FieldLayout = () => {
     fetchPlayers();
   }, [authLoading]);
   
+  // Handle drag and drop (for desktop)
   const handleDragEnd = (event) => {
     const { active, over } = event;
     
@@ -287,6 +339,38 @@ const FieldLayout = () => {
           [targetPosition]: playerToMove
         }));
       }
+    }
+  };
+  
+  // Handle click on position (for mobile)
+  const handlePositionClick = (positionKey) => {
+    if (isMobile) {
+      setSelectedPosition(positionKey);
+    }
+  };
+  
+  // Handle click on player (for mobile)
+  const handlePlayerClick = (player) => {
+    if (isMobile && selectedPosition) {
+      // Check if player is already assigned to a position
+      Object.keys(positions).forEach(pos => {
+        if (positions[pos] && positions[pos].id === player.id) {
+          // Remove from current position
+          setPositions(prev => ({
+            ...prev,
+            [pos]: null
+          }));
+        }
+      });
+      
+      // Add to selected position
+      setPositions(prev => ({
+        ...prev,
+        [selectedPosition]: player
+      }));
+      
+      // Clear selection
+      setSelectedPosition(null);
     }
   };
   
@@ -404,95 +488,182 @@ const FieldLayout = () => {
           >
             {loading ? 'Saving...' : 'Save Positions to Database'}
           </button>
+          
+          {/* Mobile instructions */}
+          {isMobile && (
+            <div className="mt-2 text-sm italic text-gray-600">
+              {selectedPosition 
+                ? `Select a player to assign to ${positionLabels[selectedPosition]}` 
+                : 'Tap a position on the field, then tap a player to assign them'}
+            </div>
+          )}
         </div>
         
-        {/* Move DndContext to wrap everything */}
-        <DndContext 
-          sensors={sensors} 
-          collisionDetection={closestCenter} 
-          onDragEnd={handleDragEnd}
-        >
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <BaseballField>
-                {/* Create drop zones for each position */}
-                {Object.entries(positions).map(([posKey, player]) => (
-                  posKey !== 'DH' && (
-                    <PositionDropZone 
-                      key={posKey}
-                      positionKey={posKey}
-                      position={positionLabels[posKey]}
-                      currentPlayer={player}
-                      onRemovePlayer={handleRemovePlayer}
-                      positionLabels={positionLabels}
-                    />
-                  )
-                ))}
-              </BaseballField>
-              
-              {/* Designated Hitter (DH) area outside the field */}
-              <div className="mt-4 p-4 border border-gray-300 rounded-lg">
-                <h3 className="font-bold mb-2">Designated Hitter (DH)</h3>
-                <div className="h-20 flex items-center">
-                  <DHDropZone 
-                    player={positions.DH} 
-                    onRemovePlayer={handleRemovePlayer} 
-                  />
-                </div>
-              </div>
-              
-              {/* Player list */}
-              <div className="mt-6 lg:hidden">
-                <h2 className="font-bold text-lg mb-2">Available Players</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {unassignedPlayers.map(player => (
-                    <DraggablePlayer 
-                      key={player.id} 
-                      player={player}
-                      isAssigned={false}
-                    />
-                  ))}
-                </div>
-              </div>
+        {/* Either use DndContext for desktop or regular div for mobile */}
+        {!isMobile ? (
+          <DndContext 
+            sensors={sensors} 
+            collisionDetection={closestCenter} 
+            onDragEnd={handleDragEnd}
+          >
+            <BaseballFieldContent 
+              positions={positions}
+              positionLabels={positionLabels}
+              handleRemovePlayer={handleRemovePlayer}
+              unassignedPlayers={unassignedPlayers}
+              isMobile={isMobile}
+              selectedPosition={selectedPosition}
+              handlePositionClick={handlePositionClick}
+              handlePlayerClick={handlePlayerClick}
+              assignedPlayerIds={assignedPlayerIds}
+            />
+          </DndContext>
+        ) : (
+          <BaseballFieldContent 
+            positions={positions}
+            positionLabels={positionLabels}
+            handleRemovePlayer={handleRemovePlayer}
+            unassignedPlayers={unassignedPlayers}
+            isMobile={isMobile}
+            selectedPosition={selectedPosition}
+            handlePositionClick={handlePositionClick}
+            handlePlayerClick={handlePlayerClick}
+            assignedPlayerIds={assignedPlayerIds}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Separated component for the BaseballField and player list to avoid duplicating code
+const BaseballFieldContent = ({ 
+  positions, 
+  positionLabels, 
+  handleRemovePlayer, 
+  unassignedPlayers,
+  isMobile,
+  selectedPosition,
+  handlePositionClick,
+  handlePlayerClick,
+  assignedPlayerIds
+}) => {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2">
+        <BaseballField>
+          {/* Create drop zones for each position */}
+          {Object.entries(positions).map(([posKey, player]) => (
+            posKey !== 'DH' && (
+              <PositionDropZone 
+                key={posKey}
+                positionKey={posKey}
+                position={positionLabels[posKey]}
+                currentPlayer={player}
+                onRemovePlayer={handleRemovePlayer}
+                positionLabels={positionLabels}
+                isMobile={isMobile}
+                onPositionClick={handlePositionClick}
+                isSelected={selectedPosition === posKey}
+              />
+            )
+          ))}
+        </BaseballField>
+        
+        {/* Designated Hitter (DH) area outside the field */}
+        <div className="mt-4 p-4 border border-gray-300 rounded-lg">
+          <h3 className="font-bold mb-2">Designated Hitter (DH)</h3>
+          <div className="h-20 flex items-center">
+            <DHDropZone 
+              player={positions.DH} 
+              onRemovePlayer={handleRemovePlayer}
+              isMobile={isMobile}
+              onPositionClick={handlePositionClick}
+              isSelected={selectedPosition === 'DH'}
+            />
+          </div>
+        </div>
+        
+        {/* Player list - mobile view */}
+        {isMobile && selectedPosition && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-lg mb-2">Select Player for {positionLabels[selectedPosition]}</h2>
+              <button 
+                onClick={() => handlePositionClick(null)} 
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                Cancel
+              </button>
             </div>
-            
-            {/* Player list for larger screens - fixed on the side */}
-            <div className="hidden lg:block">
-              <h2 className="font-bold text-lg mb-2">Available Players</h2>
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-[600px] overflow-y-auto">
-                {unassignedPlayers.length > 0 ? (
-                  unassignedPlayers.map(player => (
-                    <DraggablePlayer 
-                      key={player.id} 
-                      player={player}
-                      isAssigned={false}
-                    />
-                  ))
-                ) : (
-                  <p className="text-gray-500 italic">All players have been assigned positions</p>
-                )}
-                
-                <div className="mt-6">
-                  <h3 className="font-bold mb-2">Assigned Players</h3>
-                  {assignedPlayerIds.length > 0 ? (
-                    Object.entries(positions)
-                      .filter(([_, player]) => player !== null)
-                      .map(([posKey, player]) => (
-                        <div key={player.id} className="flex items-center mb-2 p-2 bg-blue-50 rounded border border-blue-200">
-                          <div className="flex-1">
-                            <div className="font-bold text-gray-800">{player.first_name} {player.last_name}</div>
-                            <div className="text-xs text-gray-600">#{player.jersey_number} - {positionLabels[posKey]}</div>
-                          </div>
-                        </div>
-                      ))
-                  ) : (
-                    <p className="text-gray-500 italic">No players assigned yet</p>
-                  )}
-                </div>
-              </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {unassignedPlayers.map(player => (
+                <DraggablePlayer 
+                  key={player.id} 
+                  player={player}
+                  isAssigned={false}
+                  isMobile={isMobile}
+                  onPlayerClick={handlePlayerClick}
+                />
+              ))}
             </div>
           </div>
-        </DndContext>
+        )}
+        
+        {/* Player list for mobile when no position is selected */}
+        {isMobile && !selectedPosition && (
+          <div className="mt-6">
+            <h2 className="font-bold text-lg mb-2">Available Players</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {unassignedPlayers.map(player => (
+                <DraggablePlayer 
+                  key={player.id} 
+                  player={player}
+                  isAssigned={false}
+                  isMobile={isMobile}
+                  onPlayerClick={handlePlayerClick}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Player list for larger screens - fixed on the side */}
+      <div className="hidden lg:block">
+        <h2 className="font-bold text-lg mb-2">Available Players</h2>
+        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-[600px] overflow-y-auto">
+          {unassignedPlayers.length > 0 ? (
+            unassignedPlayers.map(player => (
+              <DraggablePlayer 
+                key={player.id} 
+                player={player}
+                isAssigned={false}
+                isMobile={false}
+              />
+            ))
+          ) : (
+            <p className="text-gray-500 italic">All players have been assigned positions</p>
+          )}
+          
+          <div className="mt-6">
+            <h3 className="font-bold mb-2">Assigned Players</h3>
+            {assignedPlayerIds.length > 0 ? (
+              Object.entries(positions)
+                .filter(([_, player]) => player !== null)
+                .map(([posKey, player]) => (
+                  <div key={player.id} className="flex items-center mb-2 p-2 bg-blue-50 rounded border border-blue-200">
+                    <div className="flex-1">
+                      <div className="font-bold text-gray-800">{player.first_name} {player.last_name}</div>
+                      <div className="text-xs text-gray-600">#{player.jersey_number} - {positionLabels[posKey]}</div>
+                    </div>
+                  </div>
+                ))
+            ) : (
+              <p className="text-gray-500 italic">No players assigned yet</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
