@@ -308,22 +308,40 @@ const FieldLayout = () => {
         return;
       }
 
-      // Update each player's position in the database
-      const updates = Object.entries(positions)
+      // Get IDs of players who are assigned to positions
+      const assignedPlayerIds = new Set(
+        Object.values(positions)
+          .filter(player => player !== null)
+          .map(player => player.id)
+      );
+
+      // Create updates for positioned players
+      const positionedUpdates = Object.entries(positions)
         .filter(([_, player]) => player !== null)
         .map(([posKey, player]) => ({
           id: player.id,
           position: positionLabels[posKey] || posKey
         }));
       
-      if (updates.length === 0) {
+      // Create updates for reserve players (not on the field)
+      const reserveUpdates = players
+        .filter(player => !assignedPlayerIds.has(player.id))
+        .map(player => ({
+          id: player.id,
+          position: "Reserve" // Mark unassigned players as reserve
+        }));
+      
+      // Combine both update arrays
+      const allUpdates = [...positionedUpdates, ...reserveUpdates];
+      
+      if (allUpdates.length === 0) {
         alert('No positions to save');
         setLoading(false);
         return;
       }
       
       // Process updates one by one using the RPC function
-      for (const playerUpdate of updates) {
+      for (const playerUpdate of allUpdates) {
         const { data, error } = await supabase.rpc(
           'update_player_position', 
           { 

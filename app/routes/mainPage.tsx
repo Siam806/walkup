@@ -67,6 +67,12 @@ const MainPage = () => {
               >
                 Edit Sound Effects
               </Link>
+              <Link
+                to="/field-layout"
+                className="block p-6 bg-gray-500 text-white text-center rounded shadow hover:bg-gray-600 transition"
+              >
+                Edit Positions
+              </Link>
             </>
           )}
         </div>
