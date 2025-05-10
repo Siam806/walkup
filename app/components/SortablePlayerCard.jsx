@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import SharedYouTubePlayer from "./SharedYouTubePlayer";
+import DragHandle from './DragHandle';
 
 const SortablePlayerCard = ({
   player,
@@ -14,6 +14,8 @@ const SortablePlayerCard = ({
   currentSong,
   playerRef,
   onSongEnd,
+  movePlayerUp,
+  movePlayerDown,
 }) => {
   const {
     attributes,
@@ -25,86 +27,111 @@ const SortablePlayerCard = ({
   } = useSortable({ id: player.id });
 
   const [isLongPressed, setIsLongPressed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect if on mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   useEffect(() => {
     if (isDragging) {
       setIsLongPressed(true);
-      
-      // Reset after dragging ends
-      return () => setIsLongPressed(false);
     }
+    return () => {
+      if (isDragging) setIsLongPressed(false);
+    };
   }, [isDragging]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: isDragging ? 'none' : transition,
+    opacity: isDragging ? 0.9 : 1,
     zIndex: isDragging ? 100 : 1,
   };
 
   const isInGame = inGamePlayers.includes(player.id);
-
-  // Add this log or breakpoint check
-  console.log(`SortablePlayerCard ${player.id} - isInGame: ${isInGame}, inGamePlayers:`, inGamePlayers);
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={`border rounded-lg bg-white shadow-sm transition-all ${
-        isDragging ? 'border-blue-500 shadow-lg scale-105 bg-blue-50' : ''
-      } active:shadow-md mb-4`}
+        isDragging ? 'border-blue-500 shadow-xl' : ''
+      } mb-4`}
     >
-      {/* Mobile-optimized drag handle */}
-      <div 
-        className={`flex items-center justify-between bg-gray-100 px-4 py-4 mb-3 rounded-t border-b border-gray-200 
-          ${isLongPressed ? 'bg-blue-100' : ''} 
-          ${isDragging ? 'bg-blue-200' : ''}`}
-        {...attributes}
-        {...listeners}
-      >
-        <div className="flex items-center cursor-grab active:cursor-grabbing w-full">
-          <div className="mr-3 flex-shrink-0 bg-gray-200 p-2 rounded-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" className="text-gray-500">
-              <path d="M7 19h2c0 1.1.9 2 2 2s2-.9 2-2h2v-2H7v2zM7 5h10v2H7V5zm10 8h2V7h-2v6zm-6 0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/>
-              <path d="M7 13h2c0 1.1.9 2 2 2s2-.9 2-2h2v-2H7v2z"/>
-            </svg>
+      {/* Only show drag handle on desktop */}
+      {!isMobile ? (
+        <DragHandle 
+          attributes={attributes}
+          listeners={listeners}
+          isDragging={isDragging}
+          isLongPressed={isLongPressed}
+        />
+      ) : (
+        <div className="bg-gray-700 rounded-t-lg p-2 border-b border-gray-600 select-none">
+          <div className="flex items-center justify-center py-2 rounded-lg bg-gray-600">
+            <h3 className="font-medium text-white">
+              {player.first_name} "{player.nickname}" {player.last_name}
+            </h3>
           </div>
-          <h2 className="text-lg font-bold text-gray-800">
+        </div>
+      )}
+
+      {/* Player content */}
+      <div className="p-4 pt-3">
+        {/* Always show player name on desktop, but not on mobile (already shown in header) */}
+        {!isMobile && (
+          <h2 className="text-lg font-bold text-gray-800 mb-2">
             {player.first_name} "{player.nickname}" {player.last_name}
           </h2>
-        </div>
-      </div>
-
-      {/* Status toggle button - separated from drag handle */}
-      <div className="px-4 py-2 mb-3">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            console.log("Toggle button clicked for player", player.id);
-            toggleInGamePlayer(player.id);
-          }}
-          className={`px-4 py-2 rounded font-bold transition-colors w-full ${
-            isInGame ? "bg-green-500 hover:bg-red-500 text-white" : "bg-gray-300 hover:bg-green-500 text-gray-800 hover:text-white"
-          }`}
-        >
-          {isInGame ? "ACTIVE PLAYER" : "RESERVE PLAYER"}
-        </button>
-      </div>
-      
-      {/* Rest of the card content - no drag functionality here */}
-      <div className="player-info">
-        <p className="text-gray-700">Jersey Number: {player.jersey_number}</p>
-        <p className="text-gray-700">Position: {player.position}</p>
+        )}
         
+        {/* Always show player info */}
+        <div className="flex flex-wrap gap-2 text-sm mb-3">
+          <span className="px-2 py-1 bg-gray-700 text-white rounded">#{player.jersey_number}</span>
+          <span className="px-2 py-1 bg-gray-700 text-white rounded">{player.position}</span>
+        </div>
+        
+        {/* Status toggle button */}
+        <div className="mb-4">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log("Toggle button clicked for player", player.id);
+              toggleInGamePlayer(player.id);
+            }}
+            className={`w-full px-4 py-2 rounded font-bold transition-colors ${
+              isInGame ? "bg-green-500 hover:bg-red-500 text-white" : "bg-gray-300 hover:bg-green-500 text-gray-800 hover:text-white"
+            }`}
+          >
+            {isInGame ? "ACTIVE" : "RESERVE"}
+          </button>
+        </div>
+
         {/* Action buttons */}
-        <div className="mt-4 space-y-3">
+        <div className="space-y-2">
+          {/* Walk-up song */}
           <button
             onClick={() => handleIntro(player)}
-            className="mt-2 px-4 py-3 bg-blue-500 text-white rounded w-full text-base"
+            className={`w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 ${
+              !player.walk_up_song ? 'opacity-50' : ''
+            }`}
+            disabled={!player.walk_up_song}
           >
-            Play Walk-Up Song
+            {player.walk_up_song ? "Play Walk-Up Song" : "No Walk-Up Song"}
           </button>
+          
+          {/* Home run song */}
           <button
             onClick={() =>
               handlePlay(
@@ -116,52 +143,96 @@ const SortablePlayerCard = ({
                 player.id
               )
             }
-            className="mt-2 px-4 py-3 bg-green-700 text-white rounded w-full text-base"
+            className={`w-full px-4 py-2 bg-green-700 text-white rounded hover:bg-green-800 ${
+              !player.home_run_song ? 'opacity-50' : ''
+            }`}
+            disabled={!player.home_run_song}
           >
-            Play Home Run Song
+            {player.home_run_song ? "Play Home Run Song" : "No HR Song"}
           </button>
-          <button
-            onClick={() =>
-              handlePlay(
-                player.pitching_walk_up_song,
-                player.pitching_walk_up_song_start,
-                30,
-                100,
-                "pitching",
-                player.id
-              )
-            }
-            className="mt-2 px-4 py-2 bg-red-700 text-white rounded w-full sm:w-auto"
-          >
-            Play Pitching Walk-Up (30s)
-          </button>
+          
+          {/* Pitcher walk-up song - show for all positions that contain "P" */}
+          {(player.position === 'P' || player.position === 'SP' || player.position === 'RP' || 
+            (player.position && player.position.includes('P'))) && (
+            <button
+              onClick={() =>
+                handlePlay(
+                  player.pitching_walk_up_song,
+                  player.pitching_walk_up_song_start,
+                  null,
+                  100,
+                  "pitching",
+                  player.id
+                )
+              }
+              className={`w-full px-4 py-2 bg-purple-700 text-white rounded hover:bg-purple-800 ${
+                !player.pitching_walk_up_song ? 'opacity-50' : ''
+              }`}
+              disabled={!player.pitching_walk_up_song}
+            >
+              {player.pitching_walk_up_song ? "Pitching Entry" : "No Pitching Song"}
+            </button>
+          )}
+          
+          {/* Announcement button */}
           <button
             onClick={() => handleAnnouncement(player)}
-            className="mt-2 px-4 py-2 bg-yellow-500 text-white rounded w-full sm:w-auto"
+            className="w-full px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
           >
             Announce Player
           </button>
+        </div>
+
+        {/* Up/Down buttons for mobile only */}
+        {isMobile && isInGame && (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => {
+                if (typeof movePlayerUp === 'function') {
+                  movePlayerUp(player);
+                } else {
+                  console.error("movePlayerUp is not a function", movePlayerUp);
+                }
+              }}
+              className="px-3 py-3 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              ↑ Move Up
+            </button>
+            <button
+              onClick={() => {
+                if (typeof movePlayerDown === 'function') {
+                  movePlayerDown(player);
+                } else {
+                  console.error("movePlayerDown is not a function", movePlayerDown);
+                }
+              }}
+              className="px-3 py-3 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              ↓ Move Down
+            </button>
+          </div>
+        )}
+
+        {/* Move to End button */}
+        {isInGame && (
           <button
             onClick={() => movePlayerToEnd(player)}
-            className="mt-2 px-4 py-2 bg-gray-500 text-white rounded w-full sm:w-auto"
+            className="w-full mt-2 px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500"
           >
-            Move to End
+            Move To End
           </button>
-        </div>
-        
-        {/* YouTube player */}
+        )}
+
+        {/* Show current song indicator if this player's song is playing */}
         {currentSong && currentSong.playerId === player.id && (
-          <div className="mt-4">
-            <SharedYouTubePlayer
-              ref={playerRef}
-              key={currentSong.videoId + currentSong.songType}
-              videoId={currentSong.videoId}
-              start={currentSong.start}
-              shouldPlay={true}
-              duration={currentSong.duration}
-              volume={currentSong.volume}
-              onEnd={onSongEnd}
-            />
+          <div className="mt-4 p-2 bg-blue-100 rounded text-blue-800 text-sm flex items-center justify-between">
+            <span className="animate-pulse">▶ Now Playing</span>
+            <button 
+              onClick={() => onSongEnd && onSongEnd()}
+              className="px-2 py-1 bg-blue-200 rounded hover:bg-blue-300"
+            >
+              Stop
+            </button>
           </div>
         )}
       </div>

@@ -4,7 +4,6 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
-  TouchSensor,  // Add this import
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -42,13 +41,7 @@ const App = () => {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 150,
-        tolerance: 8,
+        distance: 5, // Desktop-only setting
       },
     }),
     useSensor(KeyboardSensor, {
@@ -80,7 +73,7 @@ const App = () => {
       try {
         const { data, error } = await supabase
           .from("players")
-          .select("*");  // No longer ordering by batting_number
+          .select("*"); // No longer ordering by batting_number
 
         if (error) throw error;
 
@@ -111,15 +104,50 @@ const App = () => {
   }, []);
 
   const handlePlay = (songUrl, startTime, duration = null, volume = 100, songType = "walkup", playerId = null) => {
+    if (!songUrl) {
+      console.log(`No ${songType} song URL provided for player ${playerId}`);
+      return;
+    }
+    
+    // Try to extract video ID
     const videoId = extractVideoId(songUrl);
+    
+    if (!videoId) {
+      console.error(`Could not extract YouTube video ID from URL: ${songUrl}`);
+      alert(`Invalid YouTube URL: ${songUrl}`);
+      return;
+    }
+    
+    console.log(`Playing ${songType} song: ${videoId} starting at ${startTime || 0} seconds, volume: ${volume}, duration: ${duration || 'unlimited'}`);
+    
+    // Set the current song with the explicitly passed duration
     setCurrentSong({
       videoId,
       start: startTime || 0,
-      duration,
+      duration: duration, // Make sure this is passed through correctly
       volume,
       songType,
       playerId,
     });
+  };
+
+  // Add this helper function
+
+  const playWalkUpSong = (player) => {
+    if (!player?.walk_up_song) return;
+    
+    const WALK_UP_DURATION = 15; // Always 15 seconds
+    
+    handlePlay(
+      player.walk_up_song,
+      player.walk_up_song_start,
+      WALK_UP_DURATION,
+      100,
+      "walkup",
+      player.id
+    );
+    
+    console.log(`Started walk-up song for ${player.first_name} ${player.last_name} with 15 second limit`);
   };
 
   const speakAnnouncement = (text, voice = "US English Male", onEndCallback = null) => {
@@ -220,7 +248,18 @@ const App = () => {
       playerRef.current.setVolume(30);
     }
 
-    handlePlay(player.walk_up_song, player.walk_up_song_start, 15, 30, "walkup", player.id);
+    // Set the duration to 15 seconds explicitly for walk-up songs
+    const WALK_UP_DURATION = 15;
+
+    // Play the walk-up song with the 15 second limit
+    handlePlay(
+      player.walk_up_song, 
+      player.walk_up_song_start, 
+      WALK_UP_DURATION, // Explicitly set to 15 seconds
+      30, 
+      "walkup", 
+      player.id
+    );
 
     if (announcementPrefs.includeVoiceIntro) {
       speakAnnouncement("Now batting...", englishVoice, () => {
@@ -271,6 +310,58 @@ const App = () => {
       PlayerManager.updateBattingOrder(updatedOrder);
       
       return updatedOrder;
+    });
+  };
+
+  const movePlayerUp = (player) => {
+    setBattingOrder((prevOrder) => {
+      // Find current active players
+      const currentInGamePlayers = prevOrder.filter(p => inGamePlayers.includes(p.id));
+      const currentReservePlayers = prevOrder.filter(p => !inGamePlayers.includes(p.id));
+      
+      // Find player index
+      const index = currentInGamePlayers.findIndex(p => p.id === player.id);
+      
+      // Can't move up if already at top
+      if (index <= 0) return prevOrder;
+      
+      // Swap with player above
+      const newInGameOrder = [...currentInGamePlayers];
+      [newInGameOrder[index], newInGameOrder[index-1]] = [newInGameOrder[index-1], newInGameOrder[index]];
+      
+      // Create new full order
+      const newFullOrder = [...newInGameOrder, ...currentReservePlayers];
+      
+      // Update manager
+      PlayerManager.updateBattingOrder(newFullOrder);
+      
+      return newFullOrder;
+    });
+  };
+
+  const movePlayerDown = (player) => {
+    setBattingOrder((prevOrder) => {
+      // Find current active players
+      const currentInGamePlayers = prevOrder.filter(p => inGamePlayers.includes(p.id));
+      const currentReservePlayers = prevOrder.filter(p => !inGamePlayers.includes(p.id));
+      
+      // Find player index
+      const index = currentInGamePlayers.findIndex(p => p.id === player.id);
+      
+      // Can't move down if already at bottom
+      if (index >= currentInGamePlayers.length - 1) return prevOrder;
+      
+      // Swap with player below
+      const newInGameOrder = [...currentInGamePlayers];
+      [newInGameOrder[index], newInGameOrder[index+1]] = [newInGameOrder[index+1], newInGameOrder[index]];
+      
+      // Create new full order
+      const newFullOrder = [...newInGameOrder, ...currentReservePlayers];
+      
+      // Update manager
+      PlayerManager.updateBattingOrder(newFullOrder);
+      
+      return newFullOrder;
     });
   };
 
@@ -391,9 +482,9 @@ const App = () => {
 
   const handleDragStart = () => {
     setIsDragging(true);
-    // You could add haptic feedback here for mobile if supported
+    // Optional haptic feedback for mobile
     if (window.navigator.vibrate) {
-      window.navigator.vibrate(50); // Light vibration to indicate drag started
+      window.navigator.vibrate(50);
     }
   };
 
@@ -402,14 +493,40 @@ const App = () => {
       <Navbar />
       <div className="h-16"></div>
       <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto">
-        {/* Mobile instructions */}
-        <div className="md:hidden mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-          <p className="font-medium mb-2">📱 Mobile Tips:</p>
-          <ul className="list-disc pl-5 space-y-1">
-            <li>Tap and hold the gray header with the <strong>drag icon</strong> to move players</li>
-            <li>Wait a moment before moving (about half a second)</li>
-            <li>Use the ACTIVE/RESERVE button to change player status</li>
-          </ul>
+        {/* Mobile instructions - only show on mobile */}
+        <div className="md:hidden mb-4 p-4 bg-blue-100 border border-blue-300 rounded-lg">
+          <h3 className="font-bold text-blue-900 mb-2">📱 Mobile Controls:</h3>
+          <p className="mb-2 text-blue-900">
+            Use these buttons to change the batting order:
+          </p>
+          <div className="flex items-center justify-center bg-blue-600 p-2 rounded mb-2">
+            <span className="font-medium text-white flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" className="mr-2">
+                <path d="M7 14l5-5 5 5H7z" fill="currentColor"/>
+              </svg>
+              UP / DOWN
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" className="ml-2">
+                <path d="M7 10l5 5 5-5H7z" fill="currentColor"/>
+              </svg>
+            </span>
+          </div>
+          <ol className="list-disc pl-5 text-blue-900">
+            <li className="mb-1">Tap <strong>Move Up</strong> to move a player higher in the order</li>
+            <li className="mb-1">Tap <strong>Move Down</strong> to move a player lower in the order</li>
+            <li>Tap <strong>Move To End</strong> to move a player to the end of the active lineup</li>
+          </ol>
+        </div>
+
+        {/* Desktop instructions - only show on desktop */}
+        <div className="hidden md:block mb-4 p-4 bg-blue-100 border border-blue-300 rounded-lg">
+          <h3 className="font-bold text-blue-900 mb-2">💻 Desktop Tips:</h3>
+          <div className="flex items-center justify-center bg-blue-600 p-2 rounded mb-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" className="mr-2 text-white">
+              <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" fill="currentColor"/>
+            </svg>
+            <span className="font-medium text-white">DRAG TO REORDER</span>
+          </div>
+          <p className="mb-2 text-blue-900">Click and drag on the gray header to reorder players in the batting lineup</p>
         </div>
 
         {/* Add loading indicator */}
@@ -470,11 +587,33 @@ const App = () => {
                 >
                   Check Sync
                 </button>
+                <button 
+                  onClick={() => {
+                    console.log("SONG DEBUG INFO:");
+                    console.log("Current song:", currentSong);
+                    console.log("YouTube player ref:", playerRef.current);
+                    
+                    // Test play with a known working video
+                    handlePlay(
+                      "https://www.youtube.com/watch?v=dQw4w9WgXcQ", // Test with Rick Astley
+                      0,
+                      null, 
+                      100,
+                      "test",
+                      null
+                    );
+                    
+                    alert("Playing test video. Check console for debug info.");
+                  }}
+                  className="px-4 py-2 bg-red-500 text-white rounded"
+                >
+                  Test Player
+                </button>
               </div>
             </div>
 
             <BattingOrderGrid
-              key={`active-${inGamePlayers.join(',')}`} // Only re-render when inGamePlayers changes
+              key={`active-${inGamePlayers.join(',')}`}
               inGame={inGame}
               inGamePlayers={inGamePlayers}
               toggleInGamePlayer={(id) => {
@@ -485,6 +624,8 @@ const App = () => {
               handlePlay={handlePlay}
               handleAnnouncement={handleAnnouncement}
               movePlayerToEnd={movePlayerToEnd}
+              movePlayerUp={movePlayerUp}
+              movePlayerDown={movePlayerDown}
               currentSong={currentSong}
               playerRef={playerRef}
               onSongEnd={() => setCurrentSong(null)}
@@ -515,6 +656,20 @@ const App = () => {
           setAnnouncementPrefs={setAnnouncementPrefs}
           onClose={() => setShowSettingsModal(false)}
         />
+      )}
+
+      {/* Make sure the YouTube player is visible */}
+      {currentSong && (
+        <div className="fixed bottom-0 right-0 z-50">
+          <SharedYouTubePlayer
+            ref={playerRef}
+            videoId={currentSong.videoId}
+            start={parseInt(currentSong.start) || 0}
+            duration={currentSong.duration}
+            volume={currentSong.volume}
+            onEnd={() => setCurrentSong(null)}
+          />
+        </div>
       )}
     </div>
   );
