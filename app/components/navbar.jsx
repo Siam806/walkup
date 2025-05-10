@@ -61,6 +61,13 @@ const Navbar = () => {
           >
             Documentation
           </Link>
+          <Link
+            to="/field-layout"
+            className="block md:inline px-4 py-2 md:p-0 hover:bg-gray-700 md:hover:bg-transparent"
+            onClick={() => setIsOpen(false)}
+          >
+            Field Layout
+          </Link>
           
           {/* Protected Links - Only Visible When Authenticated */}
           {user && (
