@@ -1,6 +1,6 @@
 import React from 'react';
 
-const DragHandle = ({ attributes, listeners, isDragging, isLongPressed }) => {
+const DragHandle = ({ attributes, listeners, isDragging, isLongPressed, battingPosition }) => {
   return (
     <div className="bg-gray-200 rounded-t-lg p-2 border-b border-gray-300 select-none">
       <div 

@@ -16,6 +16,7 @@ const SortablePlayerCard = ({
   onSongEnd,
   movePlayerUp,
   movePlayerDown,
+  battingPosition
 }) => {
   const {
     attributes,
@@ -76,10 +77,18 @@ const SortablePlayerCard = ({
           listeners={listeners}
           isDragging={isDragging}
           isLongPressed={isLongPressed}
+          battingPosition={battingPosition}
         />
       ) : (
-        <div className="bg-gray-700 rounded-t-lg p-2 border-b border-gray-600 select-none">
-          <div className="flex items-center justify-center py-2 rounded-lg bg-gray-600">
+        <div className="bg-gray-700 rounded-t-lg p-2 border-b border-gray-600 select-none relative">
+          {/* Mobile Header with batting position */}
+          <div className="flex items-center justify-center py-2 rounded-lg bg-gray-600 pl-10">
+            {/* Fixed positioning for the number badge on mobile */}
+            {battingPosition !== undefined && isInGame && (
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 bg-blue-500 text-white w-8 h-8 flex items-center justify-center rounded-full font-bold text-lg">
+                {battingPosition + 1}
+              </div>
+            )}
             <h3 className="font-medium text-white">
               {player.first_name} "{player.nickname}" {player.last_name}
             </h3>
@@ -91,9 +100,17 @@ const SortablePlayerCard = ({
       <div className="p-4 pt-3">
         {/* Always show player name on desktop, but not on mobile (already shown in header) */}
         {!isMobile && (
-          <h2 className="text-lg font-bold text-gray-800 mb-2">
-            {player.first_name} "{player.nickname}" {player.last_name}
-          </h2>
+          <div className="flex items-center mb-2">
+            {/* Add batting number badge for desktop */}
+            {battingPosition !== undefined && (
+              <div className="bg-blue-500 text-white w-7 h-7 flex items-center justify-center rounded-full font-bold mr-2">
+                {battingPosition + 1}
+              </div>
+            )}
+            <h2 className="text-lg font-bold text-gray-800">
+              {player.first_name} "{player.nickname}" {player.last_name}
+            </h2>
+          </div>
         )}
         
         {/* Always show player info */}

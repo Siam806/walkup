@@ -78,7 +78,7 @@ const BattingOrderGrid = ({
                 strategy={verticalListSortingStrategy}
               >
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {inGame.map((player) => (
+                  {inGame.map((player, index) => (
                     <SortablePlayerCard
                       key={player.id}
                       player={player}
@@ -93,6 +93,7 @@ const BattingOrderGrid = ({
                       currentSong={currentSong}
                       playerRef={playerRef}
                       onSongEnd={onSongEnd}
+                      battingPosition={index} // Pass the index as batting position
                     />
                   ))}
                 </div>
@@ -101,7 +102,7 @@ const BattingOrderGrid = ({
           ) : (
             // Simple grid for mobile, no drag functionality
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {inGame.map((player) => (
+              {inGame.map((player, index) => (
                 <SortablePlayerCard
                   key={player.id}
                   player={player}
@@ -116,6 +117,7 @@ const BattingOrderGrid = ({
                   currentSong={currentSong}
                   playerRef={playerRef}
                   onSongEnd={onSongEnd}
+                  battingPosition={index} // Pass the index as batting position
                 />
               ))}
             </div>
