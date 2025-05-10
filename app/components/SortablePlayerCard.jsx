@@ -40,17 +40,28 @@ const SortablePlayerCard = ({
     <div
       ref={setNodeRef}
       style={style}
-      className={`p-4 border rounded bg-white shadow-sm ${isDragging ? 'border-blue-500 shadow-lg' : ''}`}
+      className={`p-4 border rounded bg-white shadow-sm transition-all ${
+        isDragging ? 'border-blue-500 shadow-lg scale-105' : ''
+      } active:shadow-md`}
     >
-      {/* Drag handle header */}
+      {/* Drag handle header - make it more obvious and larger target for mobile */}
       <div 
-        className="flex items-center justify-between cursor-move bg-gray-50 px-4 py-2 mb-2 rounded-t border-b"
-        {...attributes}
-        {...listeners}
+        className="flex items-center justify-between bg-gray-50 px-4 py-3 mb-2 rounded-t border-b"
       >
-        <h2 className="text-lg font-bold text-gray-800">
-          {player.first_name} "{player.nickname}" {player.last_name}
-        </h2>
+        <div 
+          className="flex items-center cursor-grab active:cursor-grabbing w-full"
+          {...attributes}
+          {...listeners}
+        >
+          <div className="mr-2 text-gray-400">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z"/>
+            </svg>
+          </div>
+          <h2 className="text-lg font-bold text-gray-800">
+            {player.first_name} "{player.nickname}" {player.last_name}
+          </h2>
+        </div>
         
         {/* Status toggle button - not part of drag handle */}
         <button
@@ -73,10 +84,10 @@ const SortablePlayerCard = ({
         <p className="text-gray-700">Position: {player.position}</p>
         
         {/* Action buttons */}
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 space-y-3">
           <button
             onClick={() => handleIntro(player)}
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded w-full sm:w-auto"
+            className="mt-2 px-4 py-3 bg-blue-500 text-white rounded w-full text-base"
           >
             Play Walk-Up Song
           </button>
@@ -91,7 +102,7 @@ const SortablePlayerCard = ({
                 player.id
               )
             }
-            className="mt-2 px-4 py-2 bg-green-700 text-white rounded w-full sm:w-auto"
+            className="mt-2 px-4 py-3 bg-green-700 text-white rounded w-full text-base"
           >
             Play Home Run Song
           </button>

@@ -5,6 +5,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  TouchSensor,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -25,12 +26,19 @@ const BattingOrderGrid = ({
   onSongEnd,
   handleDragEnd,
 }) => {
-  // Define sensors directly in this component
+  // Use both PointerSensor and TouchSensor for better mobile support
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      // Increased activation distance to make dragging easier
+      // Reduce the activation distance for desktop
       activationConstraint: {
-        distance: 8, // 8px movement before drag starts
+        distance: 5, // 5px movement before drag starts
+      },
+    }),
+    useSensor(TouchSensor, {
+      // Optimize for touch devices - delay ensures it doesn't interfere with scrolling
+      activationConstraint: {
+        delay: 250, // wait 250ms before activating
+        tolerance: 5, // allow 5px of movement during delay
       },
     })
   );
