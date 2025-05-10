@@ -10,7 +10,6 @@ const PlayerManager = () => {
     last_name: "",
     nickname: "",
     jersey_number: "",
-    batting_number: "",
     position: "",
     walk_up_song: "",
     walk_up_song_start: "",
@@ -90,7 +89,6 @@ const PlayerManager = () => {
         last_name: "",
         nickname: "",
         jersey_number: "",
-        batting_number: "",
         position: "",
         walk_up_song: "",
         walk_up_song_start: "",
@@ -163,14 +161,6 @@ const PlayerManager = () => {
               placeholder="Jersey Number"
               className="p-2 border rounded w-full"
               required
-            />
-            <input
-              type="number"
-              name="batting_number"
-              value={form.batting_number}
-              onChange={handleChange}
-              placeholder="Batting Number"
-              className="p-2 border rounded w-full"
             />
             <select
               name="position"

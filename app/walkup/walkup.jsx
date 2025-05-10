@@ -1,11 +1,33 @@
 import React, { useState, useEffect, useRef } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { supabase } from "../supabaseClient";
 import SharedYouTubePlayer from "../components/SharedYouTubePlayer";
 import { extractVideoId } from "../utils";
 import Navbar from "../components/navbar";
+import SortablePlayerCard from "../components/SortablePlayerCard";
+import ReservePlayerCard from "../components/ReservePlayerCard";
+import AnnouncementSettingsModal from "../components/AnnouncementSettingsModal";
+import BattingOrderGrid from "../components/BattingOrderGrid";
+import ReservePlayersGrid from "../components/ReservePlayersGrid";
+import * as PlayerManager from "../components/PlayerStatusManager";
 
 const LOCAL_STORAGE_KEY = "walkup-inGamePlayers";
 const ANNOUNCEMENT_PREFS_KEY = "walkup-announcement-prefs";
+const BATTING_ORDER_KEY = "walkup-batting-order";
 
 const App = () => {
   const [players, setPlayers] = useState([]);
@@ -15,57 +37,61 @@ const App = () => {
   const playerRef = useRef(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
-  // Default announcement preferences
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const [announcementPrefs, setAnnouncementPrefs] = useState({
     includeVoiceIntro: true,
     includeJerseyNumber: true,
     includePosition: true,
   });
 
-  // Load inGamePlayers from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (stored) {
-      try {
-        setInGamePlayers(JSON.parse(stored));
-      } catch {
-        setInGamePlayers([]);
-      }
-    }
-
-    // Load announcement preferences
     const storedPrefs = localStorage.getItem(ANNOUNCEMENT_PREFS_KEY);
     if (storedPrefs) {
       try {
         setAnnouncementPrefs(JSON.parse(storedPrefs));
-      } catch {
-        // Keep defaults if parsing fails
-      }
+      } catch {}
     }
   }, []);
 
-  // Save inGamePlayers to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(inGamePlayers));
-  }, [inGamePlayers]);
-
-  // Save announcement preferences to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem(ANNOUNCEMENT_PREFS_KEY, JSON.stringify(announcementPrefs));
   }, [announcementPrefs]);
 
   useEffect(() => {
     const fetchPlayers = async () => {
-      const { data, error } = await supabase
-        .from("players")
-        .select("*")
-        .order("batting_number", { ascending: true });
+      try {
+        const { data, error } = await supabase
+          .from("players")
+          .select("*");  // No longer ordering by batting_number
 
-      if (error) {
-        console.error("Error fetching players:", error);
-      } else {
+        if (error) throw error;
+
+        console.log("Fetched players from database:", data.length);
+
+        // First set the player data
         setPlayers(data);
-        setBattingOrder(data.map((player, index) => ({ ...player, index })));
+
+        // Initialize the player manager - this will handle local order
+        PlayerManager.initializeManager(
+          data,
+          (activeIds) => {
+            console.log("Manager updated active players:", activeIds);
+            setInGamePlayers(activeIds);
+          },
+          (orderedPlayers) => {
+            console.log("Manager updated batting order:", 
+              orderedPlayers.map(p => p.id));
+            setBattingOrder(orderedPlayers);
+          }
+        );
+      } catch (error) {
+        console.error("Error in fetchPlayers:", error);
       }
     };
 
@@ -84,11 +110,7 @@ const App = () => {
     });
   };
 
-  const speakAnnouncement = (
-    text,
-    voice = "US English Male",
-    onEndCallback = null
-  ) => {
+  const speakAnnouncement = (text, voice = "US English Male", onEndCallback = null) => {
     if (window.responsiveVoice) {
       const enhancedText = text
         .replace(/:\s*/g, ". ")
@@ -129,7 +151,6 @@ const App = () => {
 
     if (announcementPrefs.includeVoiceIntro) {
       speakAnnouncement("Now batting...", englishVoice, () => {
-        // Construct middle announcement parts based on preferences
         let middle = "";
         if (announcementPrefs.includeJerseyNumber) {
           middle += `Number ${player.jersey_number}`;
@@ -151,7 +172,6 @@ const App = () => {
             });
           });
         } else {
-          // Skip middle announcement if no parts are selected
           const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
           speakAnnouncement(name, nativeVoice, () => {
             if (playerRef.current?.setVolume) {
@@ -161,7 +181,6 @@ const App = () => {
         }
       });
     } else {
-      // Only announce the name if voice intro is disabled
       const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
       speakAnnouncement(name, nativeVoice, () => {
         if (playerRef.current?.setVolume) {
@@ -189,19 +208,10 @@ const App = () => {
       playerRef.current.setVolume(30);
     }
 
-    // Start the music at 30% volume
-    handlePlay(
-      player.walk_up_song,
-      player.walk_up_song_start,
-      15,
-      30, // <-- set initial volume to 30%
-      "walkup",
-      player.id
-    );
+    handlePlay(player.walk_up_song, player.walk_up_song_start, 15, 30, "walkup", player.id);
 
     if (announcementPrefs.includeVoiceIntro) {
       speakAnnouncement("Now batting...", englishVoice, () => {
-        // Construct middle announcement parts based on preferences
         let middle = "";
         if (announcementPrefs.includeJerseyNumber) {
           middle += `Number ${player.jersey_number}`;
@@ -223,7 +233,6 @@ const App = () => {
             });
           });
         } else {
-          // Skip middle announcement if no parts are selected
           const name = `${player.first_name} "${player.nickname}" ${player.last_name}`;
           speakAnnouncement(name, nativeVoice, () => {
             if (playerRef.current?.setVolume) {
@@ -233,301 +242,246 @@ const App = () => {
         }
       });
     } else {
-      // Just play the walkup song without voice introduction
       setTimeout(() => {
         if (playerRef.current?.setVolume) {
           playerRef.current.setVolume(originalVolume);
         }
-      }, 2000); // Give it 2 seconds before restoring volume
+      }, 2000);
     }
   };
 
-  // Batting order and in-game player logic
   const movePlayerToEnd = (player) => {
     setBattingOrder((prevOrder) => {
       const updatedOrder = prevOrder.filter((p) => p.id !== player.id);
       updatedOrder.push(player);
+      
+      // Also update in PlayerManager
+      PlayerManager.updateBattingOrder(updatedOrder);
+      
       return updatedOrder;
     });
   };
 
   const toggleInGamePlayer = (playerId) => {
-    setInGamePlayers((prev) =>
-      prev.includes(playerId)
-        ? prev.filter((id) => id !== playerId)
-        : [...prev, playerId]
-    );
+    console.log(`Toggling player ${playerId}`);
+    
+    // If player is playing a song, stop it
+    if (currentSong && currentSong.playerId === playerId) {
+      setCurrentSong(null);
+    }
+    
+    // Use the manager to toggle status
+    PlayerManager.togglePlayerStatus(playerId);
   };
 
-  const getSortedPlayers = () => {
-    const inGame = battingOrder.filter((player) => inGamePlayers.includes(player.id));
-    const reserve = battingOrder.filter((player) => !inGamePlayers.includes(player.id));
-    return { inGame, reserve };
+  const saveBattingOrder = () => {
+    // Manual force save
+    PlayerManager.forceSave(inGamePlayers, battingOrder);
+    alert("Batting order and player status saved successfully");
   };
 
-  const { inGame, reserve } = getSortedPlayers();
-
-  // Only reset the order of active players
-  const resetBattingOrder = () => {
-    // Get the original order of in-game players from the players array
-    const originalOrder = players
-      .filter((p) => inGamePlayers.includes(p.id))
-      .map((p) => p.id);
-    // Set battingOrder so in-game players are in original order, reserves unchanged
-    setBattingOrder([
-      ...players.filter((p) => inGamePlayers.includes(p.id)),
-      ...players.filter((p) => !inGamePlayers.includes(p.id)),
-    ]);
-    // Optionally, you can also reset inGamePlayers to preserve only the order
-    setInGamePlayers(originalOrder);
+  const recoverSavedData = () => {
+    try {
+      // Attempt to read saved data
+      const orderStr = localStorage.getItem(BATTING_ORDER_KEY);
+      const activeStr = localStorage.getItem(LOCAL_STORAGE_KEY);
+      
+      if (!orderStr) {
+        alert("No saved batting order found");
+        return;
+      }
+      
+      const orderIds = JSON.parse(orderStr);
+      const activeIds = activeStr ? JSON.parse(activeStr) : [];
+      
+      console.log("Recovering from saved data:");
+      console.log("- Saved order:", orderIds);
+      console.log("- Saved active:", activeIds);
+      
+      // Recreate the player objects from IDs
+      const validOrderIds = orderIds.filter(id => 
+        players.some(p => p.id === id)
+      );
+      
+      const validActiveIds = activeIds.filter(id => 
+        players.some(p => p.id === id)
+      );
+      
+      // Default to first player if no valid active players
+      if (validActiveIds.length === 0 && validOrderIds.length > 0) {
+        validActiveIds.push(validOrderIds[0]);
+      }
+      
+      // Create the ordered player list
+      const orderedPlayers = validOrderIds
+        .map(id => players.find(p => p.id === id))
+        .filter(Boolean);
+      
+      // Add any missing players in random order (not by batting_number)
+      const missingPlayers = players.filter(p => !validOrderIds.includes(p.id));
+      
+      // Update state
+      setBattingOrder([...orderedPlayers, ...missingPlayers]);
+      setInGamePlayers(validActiveIds);
+      
+      alert(`Recovery successful!\nRestored ${orderedPlayers.length} players in batting order\nSet ${validActiveIds.length} active players`);
+    } catch (e) {
+      console.error("Error recovering data:", e);
+      alert("Could not recover saved data. Error: " + e.message);
+    }
   };
 
-  // Add a function to check if a player is currently playing a song
-  const isPlayerCurrent = (player) =>
-    currentSong && currentSong.videoId === extractVideoId(player.walk_up_song);
-
-  // Settings Modal Component
-  const AnnouncementSettingsModal = () => (
-    <div className="fixed inset-0 bg-gray-800 bg-opacity-75 z-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Announcement Settings</h2>
-          <button 
-            onClick={() => setShowSettingsModal(false)}
-            className="text-gray-600 hover:text-gray-800"
-          >
-            ✕
-          </button>
-        </div>
-        
-        <div className="space-y-4">
-          {/* Voice Introduction Option */}
-          <div className="flex items-center p-3 hover:bg-gray-50 rounded border border-gray-100">
-            <input
-              type="checkbox"
-              id="includeVoiceIntro"
-              checked={announcementPrefs.includeVoiceIntro}
-              onChange={e => setAnnouncementPrefs(prev => ({
-                ...prev,
-                includeVoiceIntro: e.target.checked
-              }))}
-              className="mr-3 h-5 w-5 accent-blue-500"
-            />
-            <div>
-              <label htmlFor="includeVoiceIntro" className="font-medium text-gray-500">Include Voice Introduction</label>
-              <p className="text-sm text-gray-500">Announces "Now batting" before the player's name</p>
-            </div>
-          </div>
-          
-          {/* Jersey Number Option */}
-          <div className={`flex items-center p-3 rounded border ${!announcementPrefs.includeVoiceIntro 
-            ? 'bg-gray-100 border-gray-200' 
-            : 'hover:bg-gray-50 border-gray-100'}`}
-          >
-            <input
-              type="checkbox"
-              id="includeJerseyNumber"
-              checked={announcementPrefs.includeJerseyNumber}
-              onChange={e => setAnnouncementPrefs(prev => ({
-                ...prev,
-                includeJerseyNumber: e.target.checked
-              }))}
-              disabled={!announcementPrefs.includeVoiceIntro}
-              className="mr-3 h-5 w-5 accent-blue-500"
-            />
-            <div>
-              <label 
-                htmlFor="includeJerseyNumber" 
-                className={
-                  !announcementPrefs.includeVoiceIntro 
-                    ? "font-medium text-gray-500" 
-                    : "font-medium text-gray-700"
-                }
-              >
-                Announce Jersey Number
-              </label>
-              <p className={`text-sm ${!announcementPrefs.includeVoiceIntro ? "text-gray-400" : "text-gray-500"}`}>
-                Includes "Number [X]" in the announcement
-              </p>
-            </div>
-          </div>
-          
-          {/* Position Option */}
-          <div className={`flex items-center p-3 rounded border ${!announcementPrefs.includeVoiceIntro 
-            ? 'bg-gray-100 border-gray-200' 
-            : 'hover:bg-gray-50 border-gray-100'}`}
-          >
-            <input
-              type="checkbox"
-              id="includePosition"
-              checked={announcementPrefs.includePosition}
-              onChange={e => setAnnouncementPrefs(prev => ({
-                ...prev,
-                includePosition: e.target.checked
-              }))}
-              disabled={!announcementPrefs.includeVoiceIntro}
-              className="mr-3 h-5 w-5 accent-blue-500"
-            />
-            <div>
-              <label 
-                htmlFor="includePosition"
-                className={
-                  !announcementPrefs.includeVoiceIntro 
-                    ? "font-medium text-gray-500" 
-                    : "font-medium text-gray-700"
-                }
-              >
-                Announce Position
-              </label>
-              <p className={`text-sm ${!announcementPrefs.includeVoiceIntro ? "text-gray-400" : "text-gray-500"}`}>
-                Includes "playing as [position]" in the announcement
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="mt-6 flex justify-end">
-          <button
-            onClick={() => setShowSettingsModal(false)}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
-          >
-            Save Settings
-          </button>
-        </div>
-      </div>
-    </div>
+  const inGame = React.useMemo(() => 
+    battingOrder.filter(p => inGamePlayers.includes(p.id)),
+    [battingOrder, inGamePlayers]
   );
+
+  const reserve = React.useMemo(() => 
+    battingOrder.filter(p => !inGamePlayers.includes(p.id)),
+    [battingOrder, inGamePlayers]
+  );
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    
+    if (!over || active.id === over.id) {
+      console.log("Drag ended with no valid target");
+      return;
+    }
+    
+    console.log(`Moving player ${active.id} to position ${over.id}`);
+    
+    const currentInGamePlayers = battingOrder.filter(p => inGamePlayers.includes(p.id));
+    const currentReservePlayers = battingOrder.filter(p => !inGamePlayers.includes(p.id));
+    
+    const oldIndex = currentInGamePlayers.findIndex(p => p.id === active.id);
+    const newIndex = currentInGamePlayers.findIndex(p => p.id === over.id);
+    
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newInGameOrder = arrayMove(currentInGamePlayers, oldIndex, newIndex);
+      
+      // Create the new full order
+      const newFullOrder = [...newInGameOrder, ...currentReservePlayers];
+      
+      // Update state
+      setBattingOrder(newFullOrder);
+      
+      // Notify manager
+      PlayerManager.updateBattingOrder(newFullOrder);
+      
+      console.log("Drag completed successfully");
+    } else {
+      console.error("Invalid indices for drag operation", { oldIndex, newIndex });
+    }
+  };
 
   return (
     <div>
       <Navbar />
-      <div className="h-16"></div> {/* This matches the h-16 in your navbar */}
+      <div className="h-16"></div>
       <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
-          <h1 className="text-xl sm:text-2xl font-bold">Team Walk-Up Songs</h1>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={resetBattingOrder}
-              className="px-4 py-2 bg-red-500 text-white rounded"
-            >
-              Reset Batting Order
-            </button>
-            <button 
-              onClick={() => setShowSettingsModal(true)}
-              className="px-4 py-2 bg-gray-600 text-white rounded"
-            >
-              <span className="mr-2">⚙️</span> Settings
-            </button>
+        {/* Add loading indicator */}
+        {players.length === 0 && (
+          <div className="text-center py-10">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent"></div>
+            <p className="mt-4">Loading players...</p>
           </div>
-        </div>
+        )}
         
-        {/* Active Players */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {inGame.map((player) => (
-            <div key={player.id} className="p-4 border rounded">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold mb-2">
-                  {player.first_name} "{player.nickname}" {player.last_name}
-                </h2>
-                <input
-                  type="checkbox"
-                  checked={inGamePlayers.includes(player.id)}
-                  onChange={() => toggleInGamePlayer(player.id)}
-                  className="ml-2"
-                />
-              </div>
-              <p>Jersey Number: {player.jersey_number}</p>
-              <p>Batting Number: {player.batting_number}</p>
-              <p>Position: {player.position}</p>
-              <>
-                <button
-                  onClick={() => handleIntro(player)}
-                  className="mt-2 px-4 py-2 bg-blue-500 text-white rounded w-full sm:w-auto"
-                >
-                  Play Walk-Up Song
-                </button>
-                <button
-                  onClick={() =>
-                    handlePlay(player.home_run_song, player.home_run_song_start, null, 100, "home_run", player.id)
-                  }
-                  className="mt-2 px-4 py-2 bg-green-700 text-white rounded w-full sm:w-auto"
-                >
-                  Play Home Run Song
-                </button>
-                <button
-                  onClick={() =>
-                    handlePlay(player.pitching_walk_up_song, player.pitching_walk_up_song_start, 30, 100, "pitching", player.id)
-                  }
-                  className="mt-2 px-4 py-2 bg-red-700 text-white rounded w-full sm:w-auto"
-                >
-                  Play Pitching Walk-Up (30s)
-                </button>
-                <button
-                  onClick={() => handleAnnouncement(player)}
-                  className="mt-2 px-4 py-2 bg-yellow-500 text-white rounded w-full sm:w-auto"
-                >
-                  Announce Player
-                </button>
-                <button
-                  onClick={() => movePlayerToEnd(player)}
-                  className="mt-2 px-4 py-2 bg-gray-500 text-white rounded w-full sm:w-auto"
-                >
-                  Move to End
-                </button>
-              </>
-              {/* YouTube player */}
-              {currentSong && currentSong.playerId === player.id && (
-                <div className="mt-4">
-                  <SharedYouTubePlayer
-                    ref={playerRef}
-                    key={currentSong.videoId + currentSong.songType}
-                    videoId={currentSong.videoId}
-                    start={currentSong.start}
-                    shouldPlay={true}
-                    duration={currentSong.duration}
-                    volume={currentSong.volume}
-                    onEnd={() => setCurrentSong(null)}
-                  />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Reserve Players section remains unchanged */}
-        {reserve.length > 0 && (
+        {/* Rest of your UI */}
+        {players.length > 0 && (
           <>
-            <div className="my-8 border-t border-gray-400 text-center relative">
-              <span className="bg-white px-4 text-gray-600 absolute left-1/2 -translate-x-1/2 -top-3 font-semibold">
-                Reserve Players
-              </span>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+              <h1 className="text-xl sm:text-2xl font-bold">Team Walk-Up Songs</h1>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => setShowSettingsModal(true)} className="px-4 py-2 bg-gray-600 text-white rounded">
+                  ⚙️ Settings
+                </button>
+                <button onClick={saveBattingOrder} className="px-4 py-2 bg-green-500 text-white rounded">
+                  Save Batting Order
+                </button>
+                <button 
+                  onClick={() => {
+                    console.log("CURRENT STATUS CHECK:");
+                    console.log("inGamePlayers:", inGamePlayers);
+                    console.log("localStorage value:", localStorage.getItem(LOCAL_STORAGE_KEY));
+                    console.log("battingOrder:", battingOrder.map(p => p?.id));
+                    console.log("localStorage value:", localStorage.getItem(BATTING_ORDER_KEY));
+                    
+                    // Re-save to ensure localStorage has current values
+                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(inGamePlayers));
+                    localStorage.setItem(BATTING_ORDER_KEY, JSON.stringify(battingOrder.map(p => p.id)));
+                    
+                    alert(`Current active players: ${inGamePlayers.length}\nCheck console for details.`);
+                  }}
+                  className="px-4 py-2 bg-blue-500 text-white rounded"
+                >
+                  Debug Status
+                </button>
+                <button 
+                  onClick={recoverSavedData}
+                  className="px-4 py-2 bg-yellow-500 text-white rounded"
+                >
+                  Recover Saved Data
+                </button>
+                <button
+                  onClick={() => {
+                    console.log("CURRENT STATE:");
+                    console.log("React inGamePlayers:", inGamePlayers);
+                    console.log("React battingOrder:", battingOrder.map(p => p.id));
+                    console.log("Manager active:", PlayerManager.getActivePlayerIds());
+                    console.log("Manager order:", PlayerManager.getBattingOrderIds());
+                    console.log("localStorage active:", JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]"));
+                    console.log("localStorage order:", JSON.parse(localStorage.getItem(BATTING_ORDER_KEY) || "[]"));
+                  }}
+                  className="px-4 py-2 bg-purple-500 text-white rounded"
+                >
+                  Check Sync
+                </button>
+              </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {reserve.map((player) => (
-                <div key={player.id} className="p-4 border rounded opacity-70">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold mb-2">
-                      {player.first_name} "{player.nickname}" {player.last_name}
-                    </h2>
-                    <input
-                      type="checkbox"
-                      checked={inGamePlayers.includes(player.id)}
-                      onChange={() => toggleInGamePlayer(player.id)}
-                      className="ml-2"
-                    />
-                  </div>
-                  <p>Jersey Number: {player.jersey_number}</p>
-                  <p>Batting Number: {player.batting_number}</p>
-                  <p>Position: {player.position}</p>
-                </div>
-              ))}
-            </div>
+
+            <BattingOrderGrid
+              key={`active-${inGamePlayers.join(',')}`} // Only re-render when inGamePlayers changes
+              inGame={inGame}
+              inGamePlayers={inGamePlayers}
+              toggleInGamePlayer={(id) => {
+                console.log("BattingOrderGrid calling toggleInGamePlayer with ID:", id);
+                toggleInGamePlayer(id);
+              }}
+              handleIntro={handleIntro}
+              handlePlay={handlePlay}
+              handleAnnouncement={handleAnnouncement}
+              movePlayerToEnd={movePlayerToEnd}
+              currentSong={currentSong}
+              playerRef={playerRef}
+              onSongEnd={() => setCurrentSong(null)}
+              sensors={sensors}
+              handleDragEnd={handleDragEnd}
+            />
+
+            {reserve.length > 0 && (
+              <ReservePlayersGrid
+                key={`reserve-${inGamePlayers.join(',')}`} // Same dependency
+                reserve={reserve}
+                inGamePlayers={inGamePlayers}
+                toggleInGamePlayer={(id) => {
+                  console.log("ReservePlayersGrid calling toggleInGamePlayer with ID:", id);
+                  toggleInGamePlayer(id);
+                }}
+              />
+            )}
           </>
         )}
       </div>
-      
-      {/* Settings Modal */}
-      {showSettingsModal && <AnnouncementSettingsModal />}
+
+      {showSettingsModal && (
+        <AnnouncementSettingsModal
+          announcementPrefs={announcementPrefs}
+          setAnnouncementPrefs={setAnnouncementPrefs}
+          onClose={() => setShowSettingsModal(false)}
+        />
+      )}
     </div>
   );
 };

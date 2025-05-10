@@ -140,14 +140,6 @@ const EditPlayer = () => {
             required
           />
           <input
-            type="number"
-            name="batting_number"
-            value={form.batting_number}
-            onChange={handleChange}
-            placeholder="Batting Number"
-            className="p-2 border rounded"
-          />
-          <input
             type="text"
             name="position"
             value={form.position}
