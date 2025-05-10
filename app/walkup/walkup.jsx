@@ -37,17 +37,18 @@ const App = () => {
   const [inGamePlayers, setInGamePlayers] = useState([]);
   const playerRef = useRef(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5,
+        distance: 8,
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 250,
-        tolerance: 5,
+        delay: 150,
+        tolerance: 8,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -353,6 +354,8 @@ const App = () => {
   );
 
   const handleDragEnd = (event) => {
+    setIsDragging(false); // Reset dragging state
+    
     const { active, over } = event;
     
     if (!over || active.id === over.id) {
@@ -386,11 +389,29 @@ const App = () => {
     }
   };
 
+  const handleDragStart = () => {
+    setIsDragging(true);
+    // You could add haptic feedback here for mobile if supported
+    if (window.navigator.vibrate) {
+      window.navigator.vibrate(50); // Light vibration to indicate drag started
+    }
+  };
+
   return (
     <div>
       <Navbar />
       <div className="h-16"></div>
       <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto">
+        {/* Mobile instructions */}
+        <div className="md:hidden mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+          <p className="font-medium mb-2">📱 Mobile Tips:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Tap and hold the gray header with the <strong>drag icon</strong> to move players</li>
+            <li>Wait a moment before moving (about half a second)</li>
+            <li>Use the ACTIVE/RESERVE button to change player status</li>
+          </ul>
+        </div>
+
         {/* Add loading indicator */}
         {players.length === 0 && (
           <div className="text-center py-10">
@@ -469,6 +490,8 @@ const App = () => {
               onSongEnd={() => setCurrentSong(null)}
               sensors={sensors}
               handleDragEnd={handleDragEnd}
+              handleDragStart={handleDragStart}
+              isDragging={isDragging}
             />
 
             {reserve.length > 0 && (

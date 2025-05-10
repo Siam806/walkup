@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import SharedYouTubePlayer from "./SharedYouTubePlayer";
@@ -24,6 +24,17 @@ const SortablePlayerCard = ({
     isDragging,
   } = useSortable({ id: player.id });
 
+  const [isLongPressed, setIsLongPressed] = useState(false);
+
+  useEffect(() => {
+    if (isDragging) {
+      setIsLongPressed(true);
+      
+      // Reset after dragging ends
+      return () => setIsLongPressed(false);
+    }
+  }, [isDragging]);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -40,41 +51,44 @@ const SortablePlayerCard = ({
     <div
       ref={setNodeRef}
       style={style}
-      className={`p-4 border rounded bg-white shadow-sm transition-all ${
-        isDragging ? 'border-blue-500 shadow-lg scale-105' : ''
-      } active:shadow-md`}
+      className={`border rounded-lg bg-white shadow-sm transition-all ${
+        isDragging ? 'border-blue-500 shadow-lg scale-105 bg-blue-50' : ''
+      } active:shadow-md mb-4`}
     >
-      {/* Drag handle header - make it more obvious and larger target for mobile */}
+      {/* Mobile-optimized drag handle */}
       <div 
-        className="flex items-center justify-between bg-gray-50 px-4 py-3 mb-2 rounded-t border-b"
+        className={`flex items-center justify-between bg-gray-100 px-4 py-4 mb-3 rounded-t border-b border-gray-200 
+          ${isLongPressed ? 'bg-blue-100' : ''} 
+          ${isDragging ? 'bg-blue-200' : ''}`}
+        {...attributes}
+        {...listeners}
       >
-        <div 
-          className="flex items-center cursor-grab active:cursor-grabbing w-full"
-          {...attributes}
-          {...listeners}
-        >
-          <div className="mr-2 text-gray-400">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z"/>
+        <div className="flex items-center cursor-grab active:cursor-grabbing w-full">
+          <div className="mr-3 flex-shrink-0 bg-gray-200 p-2 rounded-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" className="text-gray-500">
+              <path d="M7 19h2c0 1.1.9 2 2 2s2-.9 2-2h2v-2H7v2zM7 5h10v2H7V5zm10 8h2V7h-2v6zm-6 0c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/>
+              <path d="M7 13h2c0 1.1.9 2 2 2s2-.9 2-2h2v-2H7v2z"/>
             </svg>
           </div>
           <h2 className="text-lg font-bold text-gray-800">
             {player.first_name} "{player.nickname}" {player.last_name}
           </h2>
         </div>
-        
-        {/* Status toggle button - not part of drag handle */}
+      </div>
+
+      {/* Status toggle button - separated from drag handle */}
+      <div className="px-4 py-2 mb-3">
         <button
           onClick={(e) => {
-            e.stopPropagation(); // Prevent event bubbling
-            console.log("Toggle button clicked for player", player.id, "current status:", isInGame ? "active" : "reserve");
+            e.stopPropagation();
+            console.log("Toggle button clicked for player", player.id);
             toggleInGamePlayer(player.id);
           }}
-          className={`ml-2 px-4 py-1 rounded font-bold transition-colors ${
+          className={`px-4 py-2 rounded font-bold transition-colors w-full ${
             isInGame ? "bg-green-500 hover:bg-red-500 text-white" : "bg-gray-300 hover:bg-green-500 text-gray-800 hover:text-white"
           }`}
         >
-          {isInGame ? "ACTIVE" : "RESERVE"}
+          {isInGame ? "ACTIVE PLAYER" : "RESERVE PLAYER"}
         </button>
       </div>
       
