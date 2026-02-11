@@ -5,11 +5,39 @@ import { useAuth } from './AuthProvider';
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuth();
-  const navigate = useNavigate();
+
+  // Safe navigate with fallback for SSR/contexts without Router
+  let navigate;
+  try {
+    navigate = useNavigate();
+  } catch (e) {
+    navigate = (to) => {
+      if (typeof window !== "undefined") {
+        window.location.href = to;
+      }
+    };
+  }
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/signin");
+  };
+
+  // SafeLink component that falls back to <a> when Link context isn't available
+  const SafeLink = ({ to, children, className, onClick }) => {
+    try {
+      return (
+        <Link to={to} className={className} onClick={onClick}>
+          {children}
+        </Link>
+      );
+    } catch (e) {
+      return (
+        <a href={to} className={className} onClick={onClick}>
+          {children}
+        </a>
+      );
+    }
   };
 
   return (
@@ -33,62 +61,63 @@ const Navbar = () => {
           } md:flex md:space-x-6 absolute md:static top-16 left-0 w-full md:w-auto bg-gray-800 md:bg-transparent md:shadow-none shadow-lg`}
         >
           {/* Public Links - Always Visible */}
-          <Link
+          <SafeLink
             to="/"
             className="block md:inline px-4 py-2 md:p-0 hover:bg-gray-700 md:hover:bg-transparent"
             onClick={() => setIsOpen(false)}
           >
             Home
-          </Link>
-          <Link
+          </SafeLink>
+          <SafeLink
             to="/walkup"
             className="block md:inline px-4 py-2 md:p-0 hover:bg-gray-700 md:hover:bg-transparent"
             onClick={() => setIsOpen(false)}
           >
             Walk-Up Songs
-          </Link>
-          <Link
+          </SafeLink>
+          <SafeLink
             to="/sound-effects"
             className="block md:inline px-4 py-2 md:p-0 hover:bg-gray-700 md:hover:bg-transparent"
             onClick={() => setIsOpen(false)}
           >
             Sound Effects
-          </Link>
-          <Link
+          </SafeLink>
+          <SafeLink
             to="/documentation"
             className="block md:inline px-4 py-2 md:p-0 hover:bg-gray-700 md:hover:bg-transparent"
             onClick={() => setIsOpen(false)}
           >
             Documentation
-          </Link>
-          <Link
+          </SafeLink>
+          <SafeLink
             to="/field-layout"
             className="block md:inline px-4 py-2 md:p-0 hover:bg-gray-700 md:hover:bg-transparent"
             onClick={() => setIsOpen(false)}
           >
             Field Layout
-          </Link>
-          
+          </SafeLink>
+
           {/* Protected Links - Only Visible When Authenticated */}
           {user && (
             <>
-              <Link
+              <SafeLink
                 to="/player-manager"
                 className="block md:inline px-4 py-2 md:p-0 hover:bg-gray-700 md:hover:bg-transparent"
                 onClick={() => setIsOpen(false)}
               >
                 Player Manager
-              </Link>
-              <Link
+              </SafeLink>
+
+              <SafeLink
                 to="/edit-sound-effects"
                 className="block md:inline px-4 py-2 md:p-0 hover:bg-gray-700 md:hover:bg-transparent"
                 onClick={() => setIsOpen(false)}
               >
                 Edit Sound Effects
-              </Link>
+              </SafeLink>
             </>
           )}
-          
+
           {/* Authentication Links */}
           {user ? (
             <button
@@ -99,20 +128,21 @@ const Navbar = () => {
             </button>
           ) : (
             <>
-              <Link
+              <SafeLink
                 to="/signin"
                 className="block md:inline px-4 py-2 md:p-0 hover:bg-gray-700 md:hover:bg-transparent"
                 onClick={() => setIsOpen(false)}
               >
                 Sign In
-              </Link>
-              <Link
+              </SafeLink>
+
+              <SafeLink
                 to="/signup"
                 className="block md:inline px-4 py-2 md:p-0 hover:bg-gray-700 md:hover:bg-transparent"
                 onClick={() => setIsOpen(false)}
               >
                 Sign Up
-              </Link>
+              </SafeLink>
             </>
           )}
         </div>
