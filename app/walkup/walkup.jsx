@@ -150,25 +150,122 @@ const App = () => {
     console.log(`Started walk-up song for ${player.first_name} ${player.last_name} with 15 second limit`);
   };
 
-  const speakAnnouncement = (text, voice = "US English Male", onEndCallback = null) => {
-    if (window.responsiveVoice) {
-      const enhancedText = text
-        .replace(/:\s*/g, ". ")
-        .replace(/\.\s*/g, ". ")
-        .replace(/,/g, ", ")
-        .replace(/!+/g, ".")
-        .replace(/\s+/g, " ")
-        .trim();
+  // Queue for announcements when responsiveVoice isn't ready
+  const speechQueueRef = useRef([]);
+  const responsiveVoiceReadyRef = useRef(Boolean(window?.responsiveVoice));
 
-      window.responsiveVoice.speak(enhancedText, voice, {
-        rate: 0.92,
-        pitch: 1.02,
-        volume: 1,
-        onend: onEndCallback,
-      });
-    } else {
-      console.error("ResponsiveVoice is not loaded. Ensure the script is included globally.");
+  useEffect(() => {
+    if (responsiveVoiceReadyRef.current) return;
+    const interval = setInterval(() => {
+      if (window.responsiveVoice) {
+        responsiveVoiceReadyRef.current = true;
+        // flush queued announcements
+        while (speechQueueRef.current.length > 0) {
+          const { text, voice, onEndCallback } = speechQueueRef.current.shift();
+          try {
+            window.responsiveVoice.speak(text, voice, {
+              rate: 0.92,
+              pitch: 1.02,
+              volume: 1,
+              onend: onEndCallback,
+            });
+          } catch (e) {
+            console.error("responsiveVoice.speak failed while flushing queue", e);
+          }
+        }
+        clearInterval(interval);
+      }
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Prime TTS on first user interaction to avoid autoplay/initialization delays
+  useEffect(() => {
+    const prime = () => {
+      try {
+        if (window.responsiveVoice) {
+          // small silent utterance to warm up voices (some browsers require user gesture)
+          window.responsiveVoice.speak(" ", "US English Male", { rate: 1, volume: 0 });
+        }
+      } catch (e) {
+        /* ignore */
+      }
+
+      try {
+        if (window.speechSynthesis && typeof SpeechSynthesisUtterance !== "undefined") {
+          const u = new SpeechSynthesisUtterance(" ");
+          window.speechSynthesis.speak(u);
+          window.speechSynthesis.cancel();
+        }
+      } catch (e) {
+        /* ignore */
+      }
+
+      window.removeEventListener("pointerdown", prime);
+    };
+
+    window.addEventListener("pointerdown", prime, { once: true });
+    return () => window.removeEventListener("pointerdown", prime);
+  }, []);
+
+  const speakAnnouncement = (text, voice = "US English Male", onEndCallback = null) => {
+    const enhancedText = text
+      .replace(/:\s*/g, ". ")
+      .replace(/\.\s*/g, ". ")
+      .replace(/,/g, ", ")
+      .replace(/!+/g, ".")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    // Prefer responsiveVoice when available
+    if (window.responsiveVoice) {
+      try {
+        window.responsiveVoice.speak(enhancedText, voice, {
+          rate: 0.92,
+          pitch: 1.02,
+          volume: 1,
+          onend: onEndCallback,
+        });
+        return;
+      } catch (err) {
+        console.warn("responsiveVoice.speak threw, falling back:", err);
+      }
     }
+
+    // Queue the announcement so it will run when responsiveVoice becomes available
+    speechQueueRef.current.push({ text: enhancedText, voice, onEndCallback });
+    console.warn("responsiveVoice not ready — queued announcement");
+
+    // Fallback: use native Web Speech API if present to avoid initial silence
+    if (typeof window.speechSynthesis !== "undefined" && typeof SpeechSynthesisUtterance !== "undefined") {
+      try {
+        const utter = new SpeechSynthesisUtterance(enhancedText);
+        utter.rate = 0.92;
+        utter.pitch = 1.02;
+        utter.volume = 1;
+
+        // best-effort language mapping from responsiveVoice voice name
+        const langHint = (/Thai/i.test(voice) && "th") ||
+                         (/Japanese/i.test(voice) && "ja") ||
+                         (/Deutsch|German/i.test(voice) && "de") ||
+                         (/French/i.test(voice) && "fr") ||
+                         (/UK English/i.test(voice) && "en-GB") ||
+                         "en-US";
+        const voices = window.speechSynthesis.getVoices() || [];
+        const matched = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith(langHint.toLowerCase()));
+        if (matched) utter.voice = matched;
+
+        utter.onend = onEndCallback;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utter);
+        return;
+      } catch (e) {
+        console.warn("Native speechSynthesis fallback failed:", e);
+      }
+    }
+
+    // If neither API is available the announcement remains queued until responsiveVoice loads.
   };
 
   const handleAnnouncement = (player) => {
