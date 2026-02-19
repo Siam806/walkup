@@ -9,7 +9,7 @@ const ReservePlayerCard = ({ player, inGamePlayers, toggleInGamePlayer }) => {
   };
 
   return (
-    <div className="p-4 border rounded bg-gray-50 shadow-sm">
+    <div className="p-4 border rounded bg-gray-50 dark:bg-gray-800 shadow-sm">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold mb-2 text-gray-600">
           {player.first_name} "{player.nickname}" {player.last_name}

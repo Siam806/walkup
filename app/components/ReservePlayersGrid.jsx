@@ -7,7 +7,7 @@ const ReservePlayersGrid = ({ reserve, inGamePlayers, toggleInGamePlayer }) => {
   return (
     <>
       <div className="my-8 border-t border-gray-400 text-center relative">
-        <span className="bg-white px-4 text-gray-600 absolute left-1/2 -translate-x-1/2 -top-3 font-semibold">
+        <span className="bg-white dark:bg-gray-900 px-4 text-gray-600 dark:text-gray-300 absolute left-1/2 -translate-x-1/2 -top-3 font-semibold">
           Reserve Players
         </span>
       </div>

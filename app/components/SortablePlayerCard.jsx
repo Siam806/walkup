@@ -66,7 +66,7 @@ const SortablePlayerCard = ({
     <div
       ref={setNodeRef}
       style={style}
-      className={`border rounded-lg bg-white shadow-sm transition-all ${
+      className={`border rounded-lg bg-white dark:bg-gray-800 shadow-sm transition-all ${
         isDragging ? 'border-blue-500 shadow-xl' : ''
       } mb-4`}
     >

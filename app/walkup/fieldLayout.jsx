@@ -76,7 +76,7 @@ const PlayerSelectPanel = ({ isOpen, positionKey, positionLabel, currentPlayer, 
 
         {/* Panel: bottom sheet on mobile, centered modal on desktop */}
         <div
-          className="relative bg-white shadow-2xl flex flex-col w-full
+          className="relative bg-white dark:bg-gray-800 shadow-2xl flex flex-col w-full
             rounded-t-2xl md:rounded-2xl md:max-w-lg md:mx-4"
           style={{
             maxHeight: '70vh',
@@ -101,7 +101,7 @@ const PlayerSelectPanel = ({ isOpen, positionKey, positionLabel, currentPlayer, 
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 active:bg-gray-200 transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-200 transition-colors"
             >
               ✕
             </button>
@@ -133,7 +133,7 @@ const PlayerSelectPanel = ({ isOpen, positionKey, positionLabel, currentPlayer, 
                   <button
                     key={player.id}
                     onClick={() => onSelectPlayer(player)}
-                    className="w-full text-left px-4 py-3 bg-gray-50 rounded-xl flex items-center gap-3 hover:bg-blue-50 active:bg-blue-50 active:ring-2 active:ring-blue-300 transition-colors"
+                    className="w-full text-left px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-xl flex items-center gap-3 hover:bg-blue-50 dark:hover:bg-gray-600 active:bg-blue-50 active:ring-2 active:ring-blue-300 transition-colors"
                   >
                     <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 font-bold text-sm flex items-center justify-center flex-shrink-0">
                       #{player.jersey_number}
@@ -165,7 +165,7 @@ const LineupSummary = ({ positions, positionLabels, onPositionClick, onRemovePla
   return (
     <div className="mt-4">
       <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Current Lineup</h3>
-      <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700 overflow-hidden shadow-sm">
         {positionOrder.map(posKey => {
           const player = positions[posKey];
           return (
@@ -175,7 +175,7 @@ const LineupSummary = ({ positions, positionLabels, onPositionClick, onRemovePla
               tabIndex={0}
               onClick={() => onPositionClick(posKey)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPositionClick(posKey); } }}
-              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-50 transition-colors cursor-pointer"
+              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-50 dark:hover:bg-gray-700 dark:active:bg-gray-700 transition-colors cursor-pointer"
             >
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                 player ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'
@@ -198,12 +198,12 @@ const LineupSummary = ({ positions, positionLabels, onPositionClick, onRemovePla
                   tabIndex={0}
                   onClick={(e) => { e.stopPropagation(); onRemovePlayer(posKey, player.id); }}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); onRemovePlayer(posKey, player.id); } }}
-                  className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-red-500 active:text-red-500 rounded-full cursor-pointer"
+                  className="w-7 h-7 flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-red-500 active:text-red-500 rounded-full cursor-pointer"
                 >
                   ✕
                 </span>
               )}
-              <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </div>

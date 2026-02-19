@@ -1,55 +1,49 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../supabaseClient";
 import SharedYouTubePlayer from "../components/SharedYouTubePlayer";
 import { extractVideoId } from "../utils";
 import Navbar from "../components/navbar";
-import SortablePlayerCard from "../components/SortablePlayerCard";
-import ReservePlayerCard from "../components/ReservePlayerCard";
 import AnnouncementSettingsModal from "../components/AnnouncementSettingsModal";
-import BattingOrderGrid from "../components/BattingOrderGrid";
-import ReservePlayersGrid from "../components/ReservePlayersGrid";
-import * as PlayerManager from "../components/PlayerStatusManager";
+import BattingOrderSlots from "../components/BattingOrderSlots";
+import PlayerPool from "../components/PlayerPool";
 import { useTeam } from "../components/TeamProvider";
 
-const LOCAL_STORAGE_KEY = "walkup-inGamePlayers";
 const ANNOUNCEMENT_PREFS_KEY = "walkup-announcement-prefs";
-const BATTING_ORDER_KEY = "walkup-batting-order";
+const SLOTS_COUNT = 9;
+
+// ── Persistence helpers ───────────────────────────────────────────────────────
+
+function slotsKey(teamPrefix) {
+  return teamPrefix ? `walkup-${teamPrefix}-slots` : "walkup-slots";
+}
+
+function loadSlots(key, allPlayers) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return Array(SLOTS_COUNT).fill(null);
+    const ids = JSON.parse(raw);
+    if (!Array.isArray(ids)) return Array(SLOTS_COUNT).fill(null);
+    return ids.map((id) =>
+      id ? allPlayers.find((p) => p.id === id) ?? null : null
+    );
+  } catch {
+    return Array(SLOTS_COUNT).fill(null);
+  }
+}
+
+function persistSlots(key, slots) {
+  const ids = slots.map((p) => (p ? p.id : null));
+  localStorage.setItem(key, JSON.stringify(ids));
+}
 
 const App = () => {
   const [players, setPlayers] = useState([]);
-  const [battingOrder, setBattingOrder] = useState([]);
+  const [slots, setSlots] = useState(Array(SLOTS_COUNT).fill(null));
+  const [selectedSlot, setSelectedSlot] = useState(null);
   const [currentSong, setCurrentSong] = useState(null);
-  const [inGamePlayers, setInGamePlayers] = useState([]);
   const playerRef = useRef(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
   const { currentTeam } = useTeam();
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5, // Desktop-only setting
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
 
   const [announcementPrefs, setAnnouncementPrefs] = useState({
     includeVoiceIntro: true,
@@ -90,26 +84,12 @@ const App = () => {
 
         if (error) throw error;
 
-        console.log("Fetched players from database:", data.length);
-
-        // First set the player data
         setPlayers(data);
 
-        // Initialize the player manager — use team-scoped localStorage keys
-        const teamPrefix = currentTeam?.id ? currentTeam.id.substring(0, 8) : "default";
-        PlayerManager.initializeManager(
-          data,
-          (activeIds) => {
-            console.log("Manager updated active players:", activeIds);
-            setInGamePlayers(activeIds);
-          },
-          (orderedPlayers) => {
-            console.log("Manager updated batting order:", 
-              orderedPlayers.map(p => p.id));
-            setBattingOrder(orderedPlayers);
-          },
-          teamPrefix
-        );
+        const teamPrefix = currentTeam?.id
+          ? currentTeam.id.substring(0, 8)
+          : null;
+        setSlots(loadSlots(slotsKey(teamPrefix), data));
       } catch (error) {
         console.error("Error in fetchPlayers:", error);
       }
@@ -118,51 +98,68 @@ const App = () => {
     fetchPlayers();
   }, [currentTeam]);
 
+  // Persist slots whenever they change
+  useEffect(() => {
+    if (!players.length) return;
+    const teamPrefix = currentTeam?.id ? currentTeam.id.substring(0, 8) : null;
+    persistSlots(slotsKey(teamPrefix), slots);
+  }, [slots, currentTeam, players]);
+
+  // Unassigned players (pool)
+  const slottedIds = React.useMemo(
+    () => new Set(slots.filter(Boolean).map((p) => p.id)),
+    [slots]
+  );
+  const poolPlayers = React.useMemo(
+    () => players.filter((p) => !slottedIds.has(p.id)),
+    [players, slottedIds]
+  );
+
+  // Slot interaction handlers
+  const handleSelectSlot = useCallback((index) => {
+    setSelectedSlot((prev) => (prev === index ? null : index));
+  }, []);
+
+  const handleRemovePlayer = useCallback((index) => {
+    setSlots((prev) => {
+      const next = [...prev];
+      next[index] = null;
+      return next;
+    });
+    setSelectedSlot(null);
+  }, []);
+
+  const handleAssignPlayer = useCallback(
+    (playerId) => {
+      const player = players.find((p) => p.id === playerId);
+      if (!player) return;
+      setSlots((prev) => {
+        const next = [...prev];
+        let target =
+          selectedSlot !== null
+            ? selectedSlot
+            : next.findIndex((s) => s === null);
+        if (target === -1) target = 0;
+        const existingIndex = next.findIndex((s) => s?.id === playerId);
+        if (existingIndex !== -1 && existingIndex !== target) {
+          next[existingIndex] = next[target];
+        }
+        next[target] = player;
+        return next;
+      });
+      setSelectedSlot(null);
+    },
+    [players, selectedSlot]
+  );
+
   const handlePlay = (songUrl, startTime, duration = null, volume = 100, songType = "walkup", playerId = null) => {
-    if (!songUrl) {
-      console.log(`No ${songType} song URL provided for player ${playerId}`);
-      return;
-    }
-    
-    // Try to extract video ID
+    if (!songUrl) return;
     const videoId = extractVideoId(songUrl);
-    
     if (!videoId) {
-      console.error(`Could not extract YouTube video ID from URL: ${songUrl}`);
       alert(`Invalid YouTube URL: ${songUrl}`);
       return;
     }
-    
-    console.log(`Playing ${songType} song: ${videoId} starting at ${startTime || 0} seconds, volume: ${volume}, duration: ${duration || 'unlimited'}`);
-    
-    // Set the current song with the explicitly passed duration
-    setCurrentSong({
-      videoId,
-      start: startTime || 0,
-      duration: duration, // Make sure this is passed through correctly
-      volume,
-      songType,
-      playerId,
-    });
-  };
-
-  // Add this helper function
-
-  const playWalkUpSong = (player) => {
-    if (!player?.walk_up_song) return;
-    
-    const WALK_UP_DURATION = 15; // Always 15 seconds
-    
-    handlePlay(
-      player.walk_up_song,
-      player.walk_up_song_start,
-      WALK_UP_DURATION,
-      100,
-      "walkup",
-      player.id
-    );
-    
-    console.log(`Started walk-up song for ${player.first_name} ${player.last_name} with 15 second limit`);
+    setCurrentSong({ videoId, start: startTime || 0, duration, volume, songType, playerId });
   };
 
   // Queue for announcements when responsiveVoice isn't ready
@@ -415,351 +412,73 @@ const App = () => {
     }
   };
 
-  const movePlayerToEnd = (player) => {
-    setBattingOrder((prevOrder) => {
-      const updatedOrder = prevOrder.filter((p) => p.id !== player.id);
-      updatedOrder.push(player);
-      
-      // Also update in PlayerManager
-      PlayerManager.updateBattingOrder(updatedOrder);
-      
-      return updatedOrder;
-    });
-  };
-
-  const movePlayerUp = (player) => {
-    setBattingOrder((prevOrder) => {
-      // Find current active players
-      const currentInGamePlayers = prevOrder.filter(p => inGamePlayers.includes(p.id));
-      const currentReservePlayers = prevOrder.filter(p => !inGamePlayers.includes(p.id));
-      
-      // Find player index
-      const index = currentInGamePlayers.findIndex(p => p.id === player.id);
-      
-      // Can't move up if already at top
-      if (index <= 0) return prevOrder;
-      
-      // Swap with player above
-      const newInGameOrder = [...currentInGamePlayers];
-      [newInGameOrder[index], newInGameOrder[index-1]] = [newInGameOrder[index-1], newInGameOrder[index]];
-      
-      // Create new full order
-      const newFullOrder = [...newInGameOrder, ...currentReservePlayers];
-      
-      // Update manager
-      PlayerManager.updateBattingOrder(newFullOrder);
-      
-      return newFullOrder;
-    });
-  };
-
-  const movePlayerDown = (player) => {
-    setBattingOrder((prevOrder) => {
-      // Find current active players
-      const currentInGamePlayers = prevOrder.filter(p => inGamePlayers.includes(p.id));
-      const currentReservePlayers = prevOrder.filter(p => !inGamePlayers.includes(p.id));
-      
-      // Find player index
-      const index = currentInGamePlayers.findIndex(p => p.id === player.id);
-      
-      // Can't move down if already at bottom
-      if (index >= currentInGamePlayers.length - 1) return prevOrder;
-      
-      // Swap with player below
-      const newInGameOrder = [...currentInGamePlayers];
-      [newInGameOrder[index], newInGameOrder[index+1]] = [newInGameOrder[index+1], newInGameOrder[index]];
-      
-      // Create new full order
-      const newFullOrder = [...newInGameOrder, ...currentReservePlayers];
-      
-      // Update manager
-      PlayerManager.updateBattingOrder(newFullOrder);
-      
-      return newFullOrder;
-    });
-  };
-
-  const toggleInGamePlayer = (playerId) => {
-    console.log(`Toggling player ${playerId}`);
-    
-    // If player is playing a song, stop it
-    if (currentSong && currentSong.playerId === playerId) {
-      setCurrentSong(null);
-    }
-    
-    // Use the manager to toggle status
-    PlayerManager.togglePlayerStatus(playerId);
-  };
-
-  const saveBattingOrder = () => {
-    // Manual force save
-    PlayerManager.forceSave(inGamePlayers, battingOrder);
-    alert("Batting order and player status saved successfully");
-  };
-
-  const recoverSavedData = () => {
-    try {
-      // Attempt to read saved data
-      const orderStr = localStorage.getItem(BATTING_ORDER_KEY);
-      const activeStr = localStorage.getItem(LOCAL_STORAGE_KEY);
-      
-      if (!orderStr) {
-        alert("No saved batting order found");
-        return;
-      }
-      
-      const orderIds = JSON.parse(orderStr);
-      const activeIds = activeStr ? JSON.parse(activeStr) : [];
-      
-      console.log("Recovering from saved data:");
-      console.log("- Saved order:", orderIds);
-      console.log("- Saved active:", activeIds);
-      
-      // Recreate the player objects from IDs
-      const validOrderIds = orderIds.filter(id => 
-        players.some(p => p.id === id)
-      );
-      
-      const validActiveIds = activeIds.filter(id => 
-        players.some(p => p.id === id)
-      );
-      
-      // Default to first player if no valid active players
-      if (validActiveIds.length === 0 && validOrderIds.length > 0) {
-        validActiveIds.push(validOrderIds[0]);
-      }
-      
-      // Create the ordered player list
-      const orderedPlayers = validOrderIds
-        .map(id => players.find(p => p.id === id))
-        .filter(Boolean);
-      
-      // Add any missing players in random order (not by batting_number)
-      const missingPlayers = players.filter(p => !validOrderIds.includes(p.id));
-      
-      // Update state
-      setBattingOrder([...orderedPlayers, ...missingPlayers]);
-      setInGamePlayers(validActiveIds);
-      
-      alert(`Recovery successful!\nRestored ${orderedPlayers.length} players in batting order\nSet ${validActiveIds.length} active players`);
-    } catch (e) {
-      console.error("Error recovering data:", e);
-      alert("Could not recover saved data. Error: " + e.message);
-    }
-  };
-
-  const inGame = React.useMemo(() => 
-    battingOrder.filter(p => inGamePlayers.includes(p.id)),
-    [battingOrder, inGamePlayers]
-  );
-
-  const reserve = React.useMemo(() => 
-    battingOrder.filter(p => !inGamePlayers.includes(p.id)),
-    [battingOrder, inGamePlayers]
-  );
-
-  const handleDragEnd = (event) => {
-    setIsDragging(false); // Reset dragging state
-    
-    const { active, over } = event;
-    
-    if (!over || active.id === over.id) {
-      console.log("Drag ended with no valid target");
-      return;
-    }
-    
-    console.log(`Moving player ${active.id} to position ${over.id}`);
-    
-    const currentInGamePlayers = battingOrder.filter(p => inGamePlayers.includes(p.id));
-    const currentReservePlayers = battingOrder.filter(p => !inGamePlayers.includes(p.id));
-    
-    const oldIndex = currentInGamePlayers.findIndex(p => p.id === active.id);
-    const newIndex = currentInGamePlayers.findIndex(p => p.id === over.id);
-    
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const newInGameOrder = arrayMove(currentInGamePlayers, oldIndex, newIndex);
-      
-      // Create the new full order
-      const newFullOrder = [...newInGameOrder, ...currentReservePlayers];
-      
-      // Update state
-      setBattingOrder(newFullOrder);
-      
-      // Notify manager
-      PlayerManager.updateBattingOrder(newFullOrder);
-      
-      console.log("Drag completed successfully");
-    } else {
-      console.error("Invalid indices for drag operation", { oldIndex, newIndex });
-    }
-  };
-
-  const handleDragStart = () => {
-    setIsDragging(true);
-    // Optional haptic feedback for mobile
-    if (window.navigator.vibrate) {
-      window.navigator.vibrate(50);
-    }
+  const handleClearLineup = () => {
+    if (!window.confirm("Clear all 9 batting slots?")) return;
+    setSlots(Array(SLOTS_COUNT).fill(null));
+    setSelectedSlot(null);
   };
 
   return (
     <div>
       <Navbar />
-      <div className="h-16"></div>
+      <div className="h-16" />
       <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto">
-        {/* Mobile instructions - only show on mobile */}
-        <div className="md:hidden mb-4 p-4 bg-blue-100 border border-blue-300 rounded-lg">
-          <h3 className="font-bold text-blue-900 mb-2">📱 Mobile Controls:</h3>
-          <p className="mb-2 text-blue-900">
-            Use these buttons to change the batting order:
-          </p>
-          <div className="flex items-center justify-center bg-blue-600 p-2 rounded mb-2">
-            <span className="font-medium text-white flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" className="mr-2">
-                <path d="M7 14l5-5 5 5H7z" fill="currentColor"/>
-              </svg>
-              UP / DOWN
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" className="ml-2">
-                <path d="M7 10l5 5 5-5H7z" fill="currentColor"/>
-              </svg>
-            </span>
-          </div>
-          <ol className="list-disc pl-5 text-blue-900">
-            <li className="mb-1">Tap <strong>Move Up</strong> to move a player higher in the order</li>
-            <li className="mb-1">Tap <strong>Move Down</strong> to move a player lower in the order</li>
-            <li>Tap <strong>Move To End</strong> to move a player to the end of the active lineup</li>
-          </ol>
-        </div>
-
-        {/* Desktop instructions - only show on desktop */}
-        <div className="hidden md:block mb-4 p-4 bg-blue-100 border border-blue-300 rounded-lg">
-          <h3 className="font-bold text-blue-900 mb-2">💻 Desktop Tips:</h3>
-          <div className="flex items-center justify-center bg-blue-600 p-2 rounded mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" className="mr-2 text-white">
-              <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" fill="currentColor"/>
-            </svg>
-            <span className="font-medium text-white">DRAG TO REORDER</span>
-          </div>
-          <p className="mb-2 text-blue-900">Click and drag on the gray header to reorder players in the batting lineup</p>
-        </div>
-
-        {/* Add loading indicator */}
-        {players.length === 0 && (
+        {players.length === 0 ? (
           <div className="text-center py-10">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent"></div>
-            <p className="mt-4">Loading players...</p>
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent" />
+            <p className="mt-4">Loading players…</p>
           </div>
-        )}
-        
-        {/* Rest of your UI */}
-        {players.length > 0 && (
+        ) : (
           <>
+            {/* Header */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
               <h1 className="text-xl sm:text-2xl font-bold">Team Walk-Up Songs</h1>
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => setShowSettingsModal(true)} className="px-4 py-2 bg-gray-600 text-white rounded">
+                <button
+                  onClick={() => setShowSettingsModal(true)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded"
+                >
                   ⚙️ Settings
                 </button>
-                <button onClick={saveBattingOrder} className="px-4 py-2 bg-green-500 text-white rounded">
-                  Save Batting Order
-                </button>
-                <button 
-                  onClick={() => {
-                    console.log("CURRENT STATUS CHECK:");
-                    console.log("inGamePlayers:", inGamePlayers);
-                    console.log("localStorage value:", localStorage.getItem(LOCAL_STORAGE_KEY));
-                    console.log("battingOrder:", battingOrder.map(p => p?.id));
-                    console.log("localStorage value:", localStorage.getItem(BATTING_ORDER_KEY));
-                    
-                    // Re-save to ensure localStorage has current values
-                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(inGamePlayers));
-                    localStorage.setItem(BATTING_ORDER_KEY, JSON.stringify(battingOrder.map(p => p.id)));
-                    
-                    alert(`Current active players: ${inGamePlayers.length}\nCheck console for details.`);
-                  }}
-                  className="px-4 py-2 bg-blue-500 text-white rounded"
-                >
-                  Debug Status
-                </button>
-                <button 
-                  onClick={recoverSavedData}
-                  className="px-4 py-2 bg-yellow-500 text-white rounded"
-                >
-                  Recover Saved Data
-                </button>
                 <button
-                  onClick={() => {
-                    console.log("CURRENT STATE:");
-                    console.log("React inGamePlayers:", inGamePlayers);
-                    console.log("React battingOrder:", battingOrder.map(p => p.id));
-                    console.log("Manager active:", PlayerManager.getActivePlayerIds());
-                    console.log("Manager order:", PlayerManager.getBattingOrderIds());
-                    console.log("localStorage active:", JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]"));
-                    console.log("localStorage order:", JSON.parse(localStorage.getItem(BATTING_ORDER_KEY) || "[]"));
-                  }}
-                  className="px-4 py-2 bg-purple-500 text-white rounded"
+                  onClick={handleClearLineup}
+                  className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
                 >
-                  Check Sync
-                </button>
-                <button 
-                  onClick={() => {
-                    console.log("SONG DEBUG INFO:");
-                    console.log("Current song:", currentSong);
-                    console.log("YouTube player ref:", playerRef.current);
-                    
-                    // Test play with a known working video
-                    handlePlay(
-                      "https://www.youtube.com/watch?v=dQw4w9WgXcQ", // Test with Rick Astley
-                      0,
-                      null, 
-                      100,
-                      "test",
-                      null
-                    );
-                    
-                    alert("Playing test video. Check console for debug info.");
-                  }}
-                  className="px-4 py-2 bg-red-500 text-white rounded"
-                >
-                  Test Player
+                  🗑 Clear Lineup
                 </button>
               </div>
             </div>
 
-            <BattingOrderGrid
-              key={`active-${inGamePlayers.join(',')}`}
-              inGame={inGame}
-              inGamePlayers={inGamePlayers}
-              toggleInGamePlayer={(id) => {
-                console.log("BattingOrderGrid calling toggleInGamePlayer with ID:", id);
-                toggleInGamePlayer(id);
-              }}
+            {/* How-to hint */}
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm">
+              <strong>How to build your lineup:</strong>{" "}
+              Click an <em>empty slot</em> to select it, then click a player in
+              the pool to assign them — or tap <strong>+ Assign</strong> on any
+              player to automatically fill the next open slot. Click{" "}
+              <strong>×</strong> on a filled slot to remove that player. The
+              lineup saves automatically.
+            </div>
+
+            {/* 9 batting-order slots */}
+            <BattingOrderSlots
+              slotPlayers={slots}
+              selectedSlot={selectedSlot}
+              onSelectSlot={handleSelectSlot}
+              onRemovePlayer={handleRemovePlayer}
               handleIntro={handleIntro}
               handlePlay={handlePlay}
               handleAnnouncement={handleAnnouncement}
-              movePlayerToEnd={movePlayerToEnd}
-              movePlayerUp={movePlayerUp}
-              movePlayerDown={movePlayerDown}
               currentSong={currentSong}
               playerRef={playerRef}
               onSongEnd={() => setCurrentSong(null)}
-              sensors={sensors}
-              handleDragEnd={handleDragEnd}
-              handleDragStart={handleDragStart}
-              isDragging={isDragging}
             />
 
-            {reserve.length > 0 && (
-              <ReservePlayersGrid
-                key={`reserve-${inGamePlayers.join(',')}`} // Same dependency
-                reserve={reserve}
-                inGamePlayers={inGamePlayers}
-                toggleInGamePlayer={(id) => {
-                  console.log("ReservePlayersGrid calling toggleInGamePlayer with ID:", id);
-                  toggleInGamePlayer(id);
-                }}
-              />
-            )}
+            {/* Unassigned player pool */}
+            <PlayerPool
+              players={poolPlayers}
+              selectedSlot={selectedSlot}
+              onAssign={handleAssignPlayer}
+            />
           </>
         )}
       </div>
@@ -772,7 +491,6 @@ const App = () => {
         />
       )}
 
-      {/* Make sure the YouTube player is visible */}
       {currentSong && (
         <div className="fixed bottom-0 right-0 z-50">
           <SharedYouTubePlayer
@@ -790,3 +508,4 @@ const App = () => {
 };
 
 export default App;
+
