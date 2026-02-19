@@ -1,13 +1,22 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "../components/navbar";
 import { supabase } from "../supabaseClient";
+import { useTeam } from "../components/TeamProvider";
 
 const SoundEffects = () => {
   const [soundEffects, setSoundEffects] = useState([]);
+  const { currentTeam } = useTeam();
 
   useEffect(() => {
     const fetchSoundEffects = async () => {
-      const { data, error } = await supabase.from("sound_effects").select("*");
+      let query = supabase.from("sound_effects").select("*");
+      
+      // Scope by team if available
+      if (currentTeam?.id) {
+        query = query.eq("team_id", currentTeam.id);
+      }
+      
+      const { data, error } = await query;
       if (error) {
         console.error("Error fetching sound effects:", error);
       } else {
@@ -16,7 +25,7 @@ const SoundEffects = () => {
     };
 
     fetchSoundEffects();
-  }, []);
+  }, [currentTeam]);
 
   const playSound = (src) => {
     const audio = new Audio(src);

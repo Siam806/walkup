@@ -3,9 +3,10 @@ import Navbar from "../components/navbar";
 import { supabase } from "../supabaseClient";
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthProvider';
+import { useTeam } from '../components/TeamProvider';
 
 // Helper function to log activity
-const logActivity = async (userId, email, action, details) => {
+const logActivity = async (userId, email, action, details, teamId) => {
   try {
     const { error } = await supabase.from("activity_logs").insert([{
       user_id: userId,
@@ -13,6 +14,7 @@ const logActivity = async (userId, email, action, details) => {
       action: action,
       details: details,
       timestamp: new Date().toISOString(),
+      team_id: teamId || null,
     }]);
     
     if (error) {
@@ -30,15 +32,19 @@ const EditSoundEffects = () => {
   const [componentLoading, setComponentLoading] = useState(true);
   const [error, setError] = useState(null);
   const { user, loading: authLoading } = useAuth();
+  const { currentTeam, isAdmin, isCoach, loading: teamLoading } = useTeam();
 
   useEffect(() => {
     // Only fetch data when auth is determined
-    if (authLoading) return;
+    if (authLoading || teamLoading || !currentTeam) return;
     
     const fetchSoundEffects = async () => {
       setComponentLoading(true);
       try {
-        const { data, error } = await supabase.from("sound_effects").select("*");
+        const { data, error } = await supabase
+          .from("sound_effects")
+          .select("*")
+          .eq("team_id", currentTeam.id);
         if (error) {
           console.error("Error fetching sound effects:", error);
           setError(`Error fetching sound effects: ${error.message}`);
@@ -55,11 +61,15 @@ const EditSoundEffects = () => {
     };
     
     fetchSoundEffects();
-  }, [user, authLoading]); // Added proper dependencies
+  }, [user, authLoading, teamLoading, currentTeam]);
 
   const fetchSoundEffects = async () => {
+    if (!currentTeam) return;
     try {
-      const { data, error } = await supabase.from("sound_effects").select("*");
+      const { data, error } = await supabase
+        .from("sound_effects")
+        .select("*")
+        .eq("team_id", currentTeam.id);
       if (error) {
         console.error("Error fetching sound effects:", error);
       } else {
@@ -109,6 +119,7 @@ const EditSoundEffects = () => {
       const { data, error } = await supabase.from("sound_effects").insert([{
         label: form.label,
         src: form.src,
+        team_id: currentTeam?.id,
       }]).select();
 
       if (error) {
@@ -160,7 +171,7 @@ const EditSoundEffects = () => {
   };
 
   // Add proper loading and auth check
-  if (authLoading || componentLoading) {
+  if (authLoading || teamLoading || componentLoading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
 

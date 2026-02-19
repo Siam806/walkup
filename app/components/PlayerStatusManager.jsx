@@ -2,9 +2,9 @@
  * Player Status Manager - Reliable state persistence for player status
  */
 
-// Constants
-const LOCAL_STORAGE_KEY = "walkup-inGamePlayers";
-const BATTING_ORDER_KEY = "walkup-batting-order";
+// Constants — scoped dynamically per team
+let LOCAL_STORAGE_KEY = "walkup-inGamePlayers";
+let BATTING_ORDER_KEY = "walkup-batting-order";
 
 // Global variables to track state
 let activePlayers = [];
@@ -17,9 +17,22 @@ let callbacks = {
 
 /**
  * Initialize the manager from localStorage
+ * @param {Array} allPlayers - All player objects for this team
+ * @param {Function} onActivePlayersChange - Callback when active players change
+ * @param {Function} onBattingOrderChange - Callback when batting order changes
+ * @param {string} [teamPrefix] - Optional team ID prefix for scoping localStorage keys
  */
-export function initializeManager(allPlayers, onActivePlayersChange, onBattingOrderChange) {
-  console.log("[PlayerManager] Initializing with", allPlayers.length, "players");
+export function initializeManager(allPlayers, onActivePlayersChange, onBattingOrderChange, teamPrefix) {
+  // Scope localStorage keys by team
+  if (teamPrefix) {
+    LOCAL_STORAGE_KEY = `walkup-${teamPrefix}-inGamePlayers`;
+    BATTING_ORDER_KEY = `walkup-${teamPrefix}-battingOrder`;
+  } else {
+    LOCAL_STORAGE_KEY = "walkup-inGamePlayers";
+    BATTING_ORDER_KEY = "walkup-batting-order";
+  }
+  
+  console.log("[PlayerManager] Initializing with", allPlayers.length, "players, keys:", LOCAL_STORAGE_KEY, BATTING_ORDER_KEY);
   
   // Set callbacks
   callbacks = {

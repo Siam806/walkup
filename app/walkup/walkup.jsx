@@ -24,6 +24,7 @@ import AnnouncementSettingsModal from "../components/AnnouncementSettingsModal";
 import BattingOrderGrid from "../components/BattingOrderGrid";
 import ReservePlayersGrid from "../components/ReservePlayersGrid";
 import * as PlayerManager from "../components/PlayerStatusManager";
+import { useTeam } from "../components/TeamProvider";
 
 const LOCAL_STORAGE_KEY = "walkup-inGamePlayers";
 const ANNOUNCEMENT_PREFS_KEY = "walkup-announcement-prefs";
@@ -37,6 +38,7 @@ const App = () => {
   const playerRef = useRef(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const { currentTeam } = useTeam();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -56,24 +58,35 @@ const App = () => {
   });
 
   useEffect(() => {
-    const storedPrefs = localStorage.getItem(ANNOUNCEMENT_PREFS_KEY);
+    const prefsKey = currentTeam?.id 
+      ? `walkup-${currentTeam.id.substring(0, 8)}-announcement-prefs`
+      : ANNOUNCEMENT_PREFS_KEY;
+    const storedPrefs = localStorage.getItem(prefsKey);
     if (storedPrefs) {
       try {
         setAnnouncementPrefs(JSON.parse(storedPrefs));
       } catch {}
     }
-  }, []);
+  }, [currentTeam]);
 
   useEffect(() => {
-    localStorage.setItem(ANNOUNCEMENT_PREFS_KEY, JSON.stringify(announcementPrefs));
-  }, [announcementPrefs]);
+    const prefsKey = currentTeam?.id 
+      ? `walkup-${currentTeam.id.substring(0, 8)}-announcement-prefs`
+      : ANNOUNCEMENT_PREFS_KEY;
+    localStorage.setItem(prefsKey, JSON.stringify(announcementPrefs));
+  }, [announcementPrefs, currentTeam]);
 
   useEffect(() => {
     const fetchPlayers = async () => {
       try {
-        const { data, error } = await supabase
-          .from("players")
-          .select("*"); // No longer ordering by batting_number
+        let query = supabase.from("players").select("*");
+        
+        // Scope by team if available
+        if (currentTeam?.id) {
+          query = query.eq("team_id", currentTeam.id);
+        }
+        
+        const { data, error } = await query;
 
         if (error) throw error;
 
@@ -82,7 +95,8 @@ const App = () => {
         // First set the player data
         setPlayers(data);
 
-        // Initialize the player manager - this will handle local order
+        // Initialize the player manager — use team-scoped localStorage keys
+        const teamPrefix = currentTeam?.id ? currentTeam.id.substring(0, 8) : "default";
         PlayerManager.initializeManager(
           data,
           (activeIds) => {
@@ -93,7 +107,8 @@ const App = () => {
             console.log("Manager updated batting order:", 
               orderedPlayers.map(p => p.id));
             setBattingOrder(orderedPlayers);
-          }
+          },
+          teamPrefix
         );
       } catch (error) {
         console.error("Error in fetchPlayers:", error);
@@ -101,7 +116,7 @@ const App = () => {
     };
 
     fetchPlayers();
-  }, []);
+  }, [currentTeam]);
 
   const handlePlay = (songUrl, startTime, duration = null, volume = 100, songType = "walkup", playerId = null) => {
     if (!songUrl) {
@@ -152,7 +167,9 @@ const App = () => {
 
   // Queue for announcements when responsiveVoice isn't ready
   const speechQueueRef = useRef([]);
-  const responsiveVoiceReadyRef = useRef(Boolean(window?.responsiveVoice));
+  const responsiveVoiceReadyRef = useRef(
+    typeof window !== 'undefined' && Boolean(window.responsiveVoice)
+  );
 
   useEffect(() => {
     if (responsiveVoiceReadyRef.current) return;

@@ -8,6 +8,7 @@ import {
 } from "react-router";
 // Change this import to use the default export
 import AuthProvider from "./components/AuthProvider";
+import TeamProvider from "./components/TeamProvider";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -51,7 +52,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <AuthProvider>
-      <Outlet />
+      <TeamProvider>
+        <Outlet />
+      </TeamProvider>
     </AuthProvider>
   );
 }

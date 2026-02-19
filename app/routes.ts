@@ -16,6 +16,7 @@ export default [
   route("edit-player/:id", "./walkup/editPlayer.jsx"),
   route("edit-sound-effects", "./soundeffects/editSoundEffects.jsx"),
   route("field-layout", "./walkup/fieldLayout.jsx"),
+  route("team-management", "./routes/teamManagement.jsx"),
   
   // Catch-all route
   route("*", "./routes/notFoundPage.tsx"),

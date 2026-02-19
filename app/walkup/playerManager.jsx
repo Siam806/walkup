@@ -3,6 +3,7 @@ import { supabase } from "../supabaseClient";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import Navbar from "../components/navbar";
 import { useAuth } from '../components/AuthProvider';
+import { useTeam } from '../components/TeamProvider';
 
 const PlayerManager = () => {
   const [form, setForm] = useState({
@@ -22,31 +23,35 @@ const PlayerManager = () => {
   });
 
   const [players, setPlayers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const { user, loading: authLoading } = useAuth(); // Rename to avoid confusion
+  const [loading, setLoading] = useState(false);
+  const { user, loading: authLoading } = useAuth();
+  const { currentTeam, isAdmin, isCoach, loading: teamLoading } = useTeam();
+
+  const fetchPlayers = async () => {
+    if (!currentTeam) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("players")
+        .select("*")
+        .eq("team_id", currentTeam.id);
+      if (error) {
+        console.error("Error fetching players:", error);
+      } else {
+        setPlayers(data);
+      }
+      setLoading(false);
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Fetch all players, not just user's players
-    const fetchPlayers = async () => {
-      try {
-        const { data, error } = await supabase.from("players").select("*");
-        if (error) {
-          console.error("Error fetching players:", error);
-        } else {
-          setPlayers(data);
-        }
-        setLoading(false);
-      } catch (err) {
-        console.error("Unexpected error:", err);
-        setLoading(false);
-      }
-    };
-
-    // Only fetch data after auth is determined
-    if (!authLoading) {
+    if (!authLoading && !teamLoading && currentTeam) {
       fetchPlayers();
     }
-  }, [user, authLoading]); // Removed 'id' since it's not defined
+  }, [user, authLoading, teamLoading, currentTeam]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -64,10 +69,11 @@ const PlayerManager = () => {
       return;
     }
     
-    // Create playerData with user_id already populated
+    // Create playerData with user_id and team_id
     const playerData = { 
       ...form, 
-      user_id: user.id 
+      user_id: user.id,
+      team_id: currentTeam?.id 
     };
     
     // Debug to make sure the user_id is being sent
@@ -101,10 +107,7 @@ const PlayerManager = () => {
       });
       
       // Refresh players
-      const { data, error: fetchError } = await supabase.from("players").select("*");
-      if (!fetchError) {
-        setPlayers(data);
-      }
+      await fetchPlayers();
     }
   };
 
@@ -115,8 +118,19 @@ const PlayerManager = () => {
     return player && player.user_id === user.id;
   };
   
-  if (authLoading || loading) return <div>Loading...</div>;
+  if (authLoading || teamLoading || loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/signin" replace />;
+  if (!currentTeam) {
+    return (
+      <div>
+        <Navbar />
+        <div style={{ paddingTop: "6.5rem" }} className="p-4 max-w-md mx-auto text-center">
+          <h2 className="text-xl font-bold mb-4">No Team Selected</h2>
+          <p className="text-gray-600">Join or create a team to manage players.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -124,7 +138,8 @@ const PlayerManager = () => {
       <div style={{ paddingTop: "6.5rem" }} className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto">
         <h1 className="text-xl sm:text-2xl font-bold mb-6">Player Manager</h1>
         
-        {/* Form remains the same */}
+        {/* Add Player Form - Only for admins/coaches */}
+        {(isAdmin || isCoach) && (
         <form onSubmit={handleSubmit} className="mb-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <input
@@ -249,6 +264,7 @@ const PlayerManager = () => {
             Add Player
           </button>
         </form>
+        )}
         
         {/* Updated player list */}
         <ul className="space-y-4">
@@ -264,8 +280,8 @@ const PlayerManager = () => {
                 <p>Position: {player.position || "Not specified"}</p>
                 <p>Nationality: {player.nationality || "US"}</p>
                 
-                {/* Only show edit button for players the user owns */}
-                {(player.user_id === user.id || !player.user_id) && (
+                {/* Show edit button: admins/coaches can edit any, players can edit their own */}
+                {(isAdmin || isCoach || player.user_id === user.id || !player.user_id) && (
                   <Link
                     to={`/edit-player/${player.id}`}
                     className="mt-2 px-4 py-2 bg-green-500 text-white rounded block sm:inline-block"
@@ -291,12 +307,7 @@ const PlayerManager = () => {
                         } else {
                           alert("Player claimed successfully!");
                           // Refresh the player list
-                          const { data, error: fetchError } = await supabase.from("players").select("*");
-                          if (fetchError) {
-                            console.error("Error refreshing players:", fetchError);
-                          } else {
-                            setPlayers(data);
-                          }
+                          await fetchPlayers();
                         }
                       } catch (err) {
                         console.error("Unexpected error:", err);

@@ -4,6 +4,7 @@ import { supabase } from "../supabaseClient";
 import Navbar from "../components/navbar";
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthProvider';
+import { useTeam } from '../components/TeamProvider';
 
 const EditPlayer = () => {
   const { id } = useParams();
@@ -11,7 +12,12 @@ const EditPlayer = () => {
   const [form, setForm] = useState(null);
   const [componentLoading, setComponentLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { user, loading: authLoading } = useAuth(); // Get loading state from auth context
+  const { user, loading: authLoading } = useAuth();
+  const { isAdmin, isCoach } = useTeam();
+
+  // Players can only edit personal fields (songs, nickname)
+  // Admins and coaches can edit everything
+  const canEditAllFields = isAdmin || isCoach;
 
   useEffect(() => {
     // Only fetch data when auth is determined and we have a user
@@ -29,7 +35,7 @@ const EditPlayer = () => {
 
         if (error) {
           setError(`Error fetching player: ${error.message}`);
-        } else if (user && user.id !== data.user_id) {
+        } else if (user && user.id !== data.user_id && !isAdmin && !isCoach) {
           setError("Not authorized to edit this player");
         } else {
           setForm(data);
@@ -110,8 +116,9 @@ const EditPlayer = () => {
             value={form.first_name}
             onChange={handleChange}
             placeholder="First Name"
-            className="p-2 border rounded"
+            className={`p-2 border rounded ${!canEditAllFields ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             required
+            disabled={!canEditAllFields}
           />
           <input
             type="text"
@@ -119,8 +126,9 @@ const EditPlayer = () => {
             value={form.last_name}
             onChange={handleChange}
             placeholder="Last Name"
-            className="p-2 border rounded"
+            className={`p-2 border rounded ${!canEditAllFields ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             required
+            disabled={!canEditAllFields}
           />
           <input
             type="text"
@@ -136,8 +144,9 @@ const EditPlayer = () => {
             value={form.jersey_number}
             onChange={handleChange}
             placeholder="Jersey Number"
-            className="p-2 border rounded"
+            className={`p-2 border rounded ${!canEditAllFields ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             required
+            disabled={!canEditAllFields}
           />
           <input
             type="text"
@@ -145,7 +154,8 @@ const EditPlayer = () => {
             value={form.position}
             onChange={handleChange}
             placeholder="Position"
-            className="p-2 border rounded"
+            className={`p-2 border rounded ${!canEditAllFields ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+            disabled={!canEditAllFields}
           />
           <input
             type="text"

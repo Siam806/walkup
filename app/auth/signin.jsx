@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../components/AuthProvider";
+import { supabase } from "../supabaseClient";
 import Navbar from "../components/navbar";
 
 const SignIn = () => {
@@ -10,6 +11,50 @@ const SignIn = () => {
   const [error, setError] = useState(null);
   const { signIn } = useAuth();
   const navigate = useNavigate();
+
+  // Complete any pending team setup from signup (when email confirmation was required)
+  const completePendingTeamSetup = async () => {
+    if (typeof window === "undefined") return;
+    const raw = localStorage.getItem("walkup-pending-team-setup");
+    if (!raw) return;
+
+    try {
+      const { teamAction, teamName, inviteCode, userType } = JSON.parse(raw);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      if (teamAction === "create" && teamName) {
+        const { data: team, error: teamError } = await supabase
+          .from("teams")
+          .insert({ name: teamName.trim(), created_by: user.id })
+          .select()
+          .single();
+
+        if (teamError) throw teamError;
+
+        await supabase.from("team_members").insert({
+          user_id: user.id,
+          team_id: team.id,
+          user_type: userType || "player",
+          role: "admin",
+        });
+
+        localStorage.setItem("walkup-current-team", team.id);
+      } else if (teamAction === "join" && inviteCode) {
+        const { data } = await supabase.rpc("claim_invite_code", {
+          invite_code: inviteCode.toUpperCase().trim(),
+          member_type: userType || "player",
+        });
+        if (data?.team_id) {
+          localStorage.setItem("walkup-current-team", data.team_id);
+        }
+      }
+    } catch (err) {
+      console.error("Error completing team setup:", err);
+    } finally {
+      localStorage.removeItem("walkup-pending-team-setup");
+    }
+  };
 
   const handleSignIn = async (e) => {
     e.preventDefault();
@@ -23,10 +68,14 @@ const SignIn = () => {
 
     if (error) {
       setError(error.message);
-    } else {
-      navigate("/player-manager");
+      setLoading(false);
+      return;
     }
 
+    // Complete pending team setup if any
+    await completePendingTeamSetup();
+
+    navigate("/player-manager");
     setLoading(false);
   };
 

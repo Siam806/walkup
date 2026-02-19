@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import Navbar from '../components/navbar';
 import BaseballField from '../components/BaseballField';
 import { useAuth } from '../components/AuthProvider';
+import { useTeam } from '../components/TeamProvider';
 import { Navigate } from 'react-router-dom';
 
 // === SHARED COMPONENTS ===
@@ -79,7 +80,7 @@ const PlayerSelectPanel = ({ isOpen, positionKey, positionLabel, currentPlayer, 
             rounded-t-2xl md:rounded-2xl md:max-w-lg md:mx-4"
           style={{
             maxHeight: '70vh',
-            animation: window.innerWidth >= 768 ? 'modalIn 0.2s ease-out' : 'sheetUp 0.25s ease-out',
+            animation: (typeof window !== 'undefined' && window.innerWidth >= 768) ? 'modalIn 0.2s ease-out' : 'sheetUp 0.25s ease-out',
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -227,9 +228,10 @@ const FieldLayout = () => {
     RF: null,
     DH: null
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const { user, loading: authLoading } = useAuth();
+  const { currentTeam, isAdmin, isCoach, loading: teamLoading } = useTeam();
   
   // Position names
   const positionLabels = {
@@ -246,13 +248,15 @@ const FieldLayout = () => {
   };
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || teamLoading || !currentTeam) return;
     
     const fetchPlayers = async () => {
+      setLoading(true);
       try {
         const { data, error } = await supabase
           .from('players')
           .select('*')
+          .eq('team_id', currentTeam.id)
           .order('last_name');
         
         if (error) {
@@ -302,7 +306,7 @@ const FieldLayout = () => {
     };
     
     fetchPlayers();
-  }, [authLoading]);
+  }, [authLoading, teamLoading, currentTeam]);
   
   // Handle click on position — opens the player selection panel
   const handlePositionClick = (positionKey) => {
@@ -418,12 +422,24 @@ const FieldLayout = () => {
     }
   };
   
-  if (authLoading || loading) {
+  if (authLoading || teamLoading || loading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
   
   if (!user) {
     return <Navigate to="/signin" replace />;
+  }
+  
+  if (!currentTeam) {
+    return (
+      <div>
+        <Navbar />
+        <div style={{ paddingTop: "6.5rem" }} className="p-4 max-w-md mx-auto text-center">
+          <h2 className="text-xl font-bold mb-4">No Team Selected</h2>
+          <p className="text-gray-600">Join or create a team to manage field positions.</p>
+        </div>
+      </div>
+    );
   }
   
   // Get unassigned players (not currently on the field)
@@ -440,13 +456,17 @@ const FieldLayout = () => {
         <h1 className="text-2xl font-bold mb-6">Field Position Editor</h1>
         
         <div className="mb-6">
-          <button 
-            onClick={savePositions} 
-            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-            disabled={loading}
-          >
-            {loading ? 'Saving...' : 'Save Positions to Database'}
-          </button>
+          {(isAdmin || isCoach) ? (
+            <button 
+              onClick={savePositions} 
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              disabled={loading}
+            >
+              {loading ? 'Saving...' : 'Save Positions to Database'}
+            </button>
+          ) : (
+            <p className="text-sm text-gray-500 italic">Only coaches and admins can save position changes.</p>
+          )}
         </div>
 
         <BaseballFieldContent 
